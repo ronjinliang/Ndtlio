@@ -32,6 +32,8 @@ private:
 
     double imu_dt_ = 0.01;
     
+    Vec2d ba_ = Vec2d::Zero();
+    double bg_ = 0.0;
     double gyro_var_ = 1e-2;
     double acce_var_ = 1e-2;
     double bias_gyro_var_ = 1e-4;
@@ -44,8 +46,8 @@ private:
     int ieskf_num_iterations_ = 3; // 迭代次数
     double ieskf_eps_ = 1e-3;     // 终止迭代的dx大小
     double ieskf_info_ratio_ = 0.01;
-    bool ieskf_update_bias_gyro_ = true;
-    bool ieskf_update_bias_acce_ = true;
+    bool update_bias_gyro_ = true;
+    bool update_bias_acce_ = true;
 
     double pre_info_wright_ = 0.1;
     double pre_ndt_pos_noise_ = 0.1;

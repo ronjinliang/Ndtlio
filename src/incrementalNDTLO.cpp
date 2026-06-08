@@ -61,12 +61,16 @@ IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu )
     }
 
     imu_dt_                 = config["imu"]["imu_dt"].as<double>();
+    ba_                     = Vec2d(config["imu"]["bax"].as<double>(), config["imu"]["bay"].as<double>());
+    bg_                     = config["imu"]["bg"].as<double>();
     
     gyro_var_               = config["imu"]["gyro_var"].as<double>();
     acce_var_               = config["imu"]["acce_var"].as<double>();
     bias_gyro_var_          = config["imu"]["bias_gyro_var"].as<double>();
     bias_acce_var_          = config["imu"]["bias_acce_var"].as<double>();
     odom_var_               = config["imu"]["odom_var"].as<double>();
+    update_bias_gyro_       = config["imu"]["update_bias_gyro"].as<bool>();
+    update_bias_acce_       = config["imu"]["update_bias_acce"].as<bool>();
 
     eskf_lidar_pos_noise_   = config["imu"]["eskf"]["lidar_pos_noise"].as<double>();
     eskf_lidar_ang_noise_   = config["imu"]["eskf"]["lidar_ang_noise"].as<double>();
@@ -74,9 +78,6 @@ IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu )
     ieskf_num_iterations_   = config["imu"]["ieskf"]["num_iterations"].as<int>();
     ieskf_eps_              = config["imu"]["ieskf"]["eps"].as<double>();
     ieskf_info_ratio_       = config["imu"]["ieskf"]["info_ratio"].as<double>();
-    ieskf_update_bias_gyro_ = config["imu"]["ieskf"]["update_bias_gyro"].as<bool>();
-    ieskf_update_bias_acce_ = config["imu"]["ieskf"]["update_bias_acce"].as<bool>();
-
 }
 
 IncrementalNDTLO::~IncrementalNDTLO(){
@@ -105,8 +106,8 @@ bool IncrementalNDTLO::initIMU( IMUPtr imu ){
         //     static_imu_init_.GetInitBa()(1) + static_imu_init_.GetGravity()(1));
         
         // 自己的数据集直接设定  origincar3 数据集没有停10s
-        double bg = -0.0270514;
-        Vec2d ba = Vec2d(-0.0506324, 0.453892);
+        Vec2d ba = ba_;
+        double bg = bg_;
 
         LOG(INFO) << "gyro var: " << gyro_var << ", acce var: " << acce_var 
                 << ", bias gyro var: " << bias_gyro_var << ", bias acce var: " << bias_acce_var
