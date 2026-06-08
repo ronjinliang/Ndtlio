@@ -104,6 +104,7 @@ void NDTLIONode::signCallback( const std_msgs::msg::Int32::SharedPtr msg ){
         ndt_lio_ = sad::IncrementalNDTLO(config_file_, with_imu_);
         // timer_static_tf_->reset();
         // timer_tf_->reset();
+        has_initial_pose_ = false;
         LOG(INFO) << "stop publish tf";
     }
 }
