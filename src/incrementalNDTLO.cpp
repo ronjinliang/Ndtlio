@@ -123,6 +123,8 @@ bool IncrementalNDTLO::initIMU( IMUPtr imu ){
             opts.odom_var_        = odom_var_;
             opts.lidar_pos_noise_ = eskf_lidar_pos_noise_;
             opts.lidar_ang_noise_ = eskf_lidar_ang_noise_;
+            opts.update_bias_gyro_ = update_bias_gyro_;
+            opts.update_bias_acce_ = update_bias_acce_;
             eskf_->setInitCondition(opts, bg, ba);
             LOG(INFO) << "ESKF: imu init finished.";
         } else if ( ieskf_ ) {
@@ -138,8 +140,8 @@ bool IncrementalNDTLO::initIMU( IMUPtr imu ){
             opts.bias_acce_var_  = bias_acce_var;
 
             opts.odom_var_         = odom_var_;
-            opts.update_bias_gyro_ = ieskf_update_bias_gyro_;
-            opts.update_bias_acce_ = ieskf_update_bias_acce_;
+            opts.update_bias_gyro_ = update_bias_gyro_;
+            opts.update_bias_acce_ = update_bias_acce_;
 
             ieskf_->setInitCondition(opts, bg, ba);
             LOG(INFO) << "IESKF: imu init finished.";
