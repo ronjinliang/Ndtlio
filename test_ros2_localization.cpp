@@ -1,4 +1,4 @@
-#include "NdtLIO/ros2node/ndt_lio_node.h"
+#include "ros2node/ndt_lio_node.h"
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);

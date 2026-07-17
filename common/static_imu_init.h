@@ -1,10 +1,10 @@
 #ifndef __STATIC_IMU_INIT_H
 #define __STATIC_IMU_INIT_H
 
-#include "NdtLIO/common/eigen_types.h"
-#include "NdtLIO/common/imu.h"
-#include "NdtLIO/common/odom.h"
-#include "NdtLIO/common/math_utils.h"
+#include "../common/eigen_types.h"
+#include "../common/imu.h"
+#include "../common/odom.h"
+#include "../common/math_utils.h"
 
 #include <deque>
 #include <glog/logging.h>

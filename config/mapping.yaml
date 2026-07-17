@@ -33,12 +33,17 @@ occupancy_map:
 
 imu:
   imu_dt: 0.01   # 0.01s 即 100Hz   检查时间戳用的
+  bax: -0.0506324
+  bay: 0.453892
+  bg: -0.0270514
   # 噪声设为负数，系统自动计算
   gyro_var: 2e-1
   acce_var: 2e-2
   bias_gyro_var: -1
   bias_acce_var: -1
   odom_var: 0.5  # 轮速计噪声   正数则在预积分中加入 odom 观测
+  update_bias_gyro: true
+  update_bias_acce: true
   eskf:
     imu_dt: 0.01   # 0.01s 即 100Hz
     lidar_pos_noise: 0.01
@@ -49,5 +54,3 @@ imu:
     num_iterations: 10 # 迭代次数
     eps: 1e-3          # 终止迭代的dx大小
     info_ratio: 0.01    # 每个点反馈的info因子
-    update_bias_gyro: true   # 迭代过程中是否更新 bg
-    update_bias_acce: true   # 迭代过程中是否更新 ba

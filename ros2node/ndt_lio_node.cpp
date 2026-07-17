@@ -1,14 +1,14 @@
-#include "NdtLIO/ros2node/ndt_lio_node.h"
-#include "NdtLIO/include/frame.h"
-#include "NdtLIO/common/imu.h"
-#include "NdtLIO/common/odom.h"
+#include "../ros2node/ndt_lio_node.h"
+#include "../include/frame.h"
+#include "../common/imu.h"
+#include "../common/odom.h"
 #include "std_msgs/msg/int32.hpp"
 
 #include <yaml-cpp/yaml.h>
 
 NDTLIONode::NDTLIONode( const std::string & nodeName ) : Node(nodeName) {
     // 读取配置参数;
-    this->declare_parameter<std::string>("config_file", "/userdata/lrj_test_mppi/src/NdtLIO/config/ndt_params_origincar.yaml");
+    this->declare_parameter<std::string>("config_file", "/home/lrj/origincar_ws/src/Ndtlio/config/mapping.yaml");
     this->get_parameter("config_file", config_file_);
     LOG(INFO) << "use config: " << config_file_;
     

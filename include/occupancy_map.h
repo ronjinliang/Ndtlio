@@ -1,8 +1,8 @@
 #ifndef __OCCUPANCY_MAP_H
 #define __OCCUPANCY_MAP_H
 
-#include "NdtLIO/include/frame.h"
-#include "NdtLIO/common/eigen_types.h"
+#include "../include/frame.h"
+#include "../common/eigen_types.h"
 
 #include <opencv2/core.hpp>
 

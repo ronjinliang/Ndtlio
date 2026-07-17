@@ -11,8 +11,8 @@
 #include <Eigen/Geometry>
 
 ///  sb 编译器总是找系统的头文件
-#include "NdtLIO/3rdparty/sophus/se2.hpp"
-#include "NdtLIO/3rdparty/sophus/se3.hpp"
+#include "../3rdparty/sophus/se2.hpp"
+#include "../3rdparty/sophus/se3.hpp"
 
 using Vec2i = Eigen::Vector2i;
 using Vec3i = Eigen::Vector3i;

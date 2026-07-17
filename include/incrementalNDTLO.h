@@ -1,12 +1,12 @@
 #ifndef __INCREMENTALNDTLO_H
 #define __INCREMENTALNDTLO_H
 
-#include "NdtLIO/include/frame.h"
-#include "NdtLIO/include/frontend.h"
-#include "NdtLIO/include/map.h"
-#include "NdtLIO/include/eskf.h"
-#include "NdtLIO/include/ieskf.h"
-#include "NdtLIO/common/static_imu_init.h"
+#include "../include/frame.h"
+#include "../include/frontend.h"
+#include "../include/map.h"
+#include "../include/eskf.h"
+#include "../include/ieskf.h"
+#include "../common/static_imu_init.h"
 
 namespace sad {
 

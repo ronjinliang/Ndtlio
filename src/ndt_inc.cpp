@@ -1,5 +1,5 @@
-#include "NdtLIO/include/ndt_inc.h"
-#include "NdtLIO/common/math_utils.h"
+#include "../include/ndt_inc.h"
+#include "../common/math_utils.h"
 #include <glog/logging.h>
 #include <set>
 #include <execution>

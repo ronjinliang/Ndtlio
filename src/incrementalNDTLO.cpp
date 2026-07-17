@@ -1,4 +1,4 @@
-#include "NdtLIO/include/incrementalNDTLO.h"
+#include "../include/incrementalNDTLO.h"
 #include <yaml-cpp/yaml.h>
 #include <glog/logging.h>
 #include <opencv2/imgproc.hpp>
