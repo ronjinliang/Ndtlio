@@ -6,7 +6,7 @@
 #define MAPPING_IMU_H
 
 #include <memory>
-#include "NdtLIO/common/eigen_types.h"
+#include "../common/eigen_types.h"
 
 namespace sad {
 

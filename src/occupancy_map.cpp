@@ -1,5 +1,5 @@
-#include "NdtLIO/include/occupancy_map.h"
-#include "NdtLIO/common/math_utils.h"
+#include "../include/occupancy_map.h"
+#include "../common/math_utils.h"
 
 #include <glog/logging.h>
 #include <execution>

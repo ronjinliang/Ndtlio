@@ -5,12 +5,12 @@
 #include <memory>
 #include <opencv2/core.hpp>
 
-#include "NdtLIO/include/frame.h"
-#include "NdtLIO/include/map.h"
-#include "NdtLIO/include/eskf.h"
-#include "NdtLIO/include/ieskf.h"
+#include "../include/frame.h"
+#include "../include/map.h"
+#include "../include/eskf.h"
+#include "../include/ieskf.h"
 
-#include "NdtLIO/common/eigen_types.h"
+#include "../common/eigen_types.h"
 
 
 namespace sad {

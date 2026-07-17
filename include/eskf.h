@@ -1,9 +1,9 @@
 #ifndef __ESKF_H
 #define __ESKF_H
 
-#include "NdtLIO/common/eigen_types.h"
-#include "NdtLIO/common/imu.h"
-#include "NdtLIO/common/odom.h"
+#include "../common/eigen_types.h"
+#include "../common/imu.h"
+#include "../common/odom.h"
 
 namespace sad {
 /**

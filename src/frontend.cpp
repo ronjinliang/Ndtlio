@@ -1,4 +1,4 @@
-#include "NdtLIO/include/frontend.h"
+#include "../include/frontend.h"
 
 #include <yaml-cpp/yaml.h>
 #include <glog/logging.h>

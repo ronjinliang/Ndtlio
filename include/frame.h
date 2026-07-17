@@ -4,7 +4,7 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <std_msgs/msg/header.hpp>
 
-#include "NdtLIO/common/eigen_types.h"
+#include "../common/eigen_types.h"
 
 #include <glog/logging.h>
 #include <fstream>

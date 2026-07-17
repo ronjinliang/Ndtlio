@@ -31,8 +31,8 @@ find_package(TBB REQUIRED)
 
 find_package(yaml-cpp REQUIRED)
 
-include_directories(${PROJECT_SOURCE_DIR}/..)
-include_directories(${PROJECT_SOURCE_DIR}/../../3rdparty/src)   # 3rdparty的头文件
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/../3rdparty/src)   # 3rdparty的头文件
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)      # LIO
 

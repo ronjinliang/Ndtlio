@@ -20,7 +20,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 
-#include "NdtLIO/include/incrementalNDTLO.h"
+#include "../include/incrementalNDTLO.h"
 
 /* laser gyro_link */
 

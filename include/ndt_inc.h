@@ -1,9 +1,9 @@
 #ifndef __NDT_INC_H
 #define __NDT_INC_H
 
-#include "NdtLIO/common/eigen_types.h"
+#include "../common/eigen_types.h"
 
-#include "NdtLIO/include/frame.h"
+#include "../include/frame.h"
 
 #include <list>
 #include <mutex>
