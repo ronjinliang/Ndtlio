@@ -125,49 +125,57 @@ void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
     }
 }
 
-inline bool Frontend::poseInterp(double query_time, double last_time, SE2 & result, float time_th ){
-    if ( query_time > last_time ) {
-        if (query_time < (last_time + time_th)) {
-            // 尚可接受
+inline bool Frontend::poseInterp(double query_time, double last_time, SE2 & result, float time_th) {
+    if (imu_states_.empty()) return false;
+
+    // 1. 查询时间晚于最新状态的处理（短暂外推）
+    if (query_time > last_time) {
+        if (query_time < last_time + time_th) {
             result = imu_states_.rbegin()->second;
             return true;
         }
         return false;
     }
 
-    auto match_iter = imu_states_.begin();
-    for (auto iter = imu_states_.begin(); iter != imu_states_.end(); ++iter) {
-        auto next_iter = iter;
-        ++next_iter;
-        if ( iter->first < query_time && next_iter->first >= query_time) {
-            match_iter = iter;
-            break;
-        }
-    }
-
-    auto match_iter_n = match_iter;
-    ++match_iter_n;
-
-    double dt = match_iter_n->first - match_iter->first;
-    double s = (query_time - match_iter->first) / dt;   // s=0 时为第一帧，s=1时为next
-    // 出现了 dt为0的bug
-    if (fabs(dt) < 1e-6) {
-        result = match_iter->second;
+    // 2. 边界保护：早于或等于最早状态
+    if (query_time <= imu_states_.begin()->first) {
+        result = imu_states_.begin()->second;
         return true;
     }
-    SE2 pose_first = match_iter->second;
-    SE2 pose_next = match_iter_n->second;
-    // 角度需要考虑周期
-    double theta_first = pose_first.so2().log();
-    double theta_next  = pose_next.so2().log();
-    double delta_angle = theta_next - theta_first;
-    if ( delta_angle > M_PI)   delta_angle -= 2*M_PI;
-    if ( delta_angle < -M_PI ) delta_angle += 2*M_PI;
-    // 平移插值
-    double interp_angle = theta_first + s * delta_angle;
 
-    Vec2d interp_t = pose_first.translation() * (1-s) + pose_next.translation() * s;
-    result = SE2( interp_angle, interp_t );
+    // 3. 定位到包含 query_time 的区间 [iter->first, next_iter->first]
+    auto iter = imu_states_.begin();
+    auto next_iter = std::next(iter);
+    while (next_iter != imu_states_.end() && next_iter->first < query_time) {
+        ++iter;
+        ++next_iter;
+    }
+
+    // 安全保护：若未找到（理论上不会），回退到最近的状态
+    if (next_iter == imu_states_.end()) {
+        result = iter->second;
+        return true;
+    }
+
+    const double dt = next_iter->first - iter->first;
+    if (dt < 1e-6) {
+        result = iter->second;
+        return true;
+    }
+
+    double s = (query_time - iter->first) / dt;
+    s = std::clamp(s, 0.0, 1.0);   // 防止数值微小越界
+
+    const SE2& T_a = iter->second;
+    const SE2& T_b = next_iter->second;
+
+    // 4. 李代数插值：result = T_a * exp(s * log(T_a^{-1} * T_b))
+    SE2 relative = T_a.inverse() * T_b;
+
+    auto log_rel = relative.log();        // 3维向量，例如 Eigen::Vector3d
+    log_rel *= s;
+    SE2 delta = SE2::exp(log_rel);
+    result = T_a * delta;
     return true;
 }
 
