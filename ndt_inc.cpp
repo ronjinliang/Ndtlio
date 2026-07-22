@@ -1,5 +1,5 @@
-#include "../include/ndt_inc.h"
-#include "../common/math_utils.h"
+#include "2dNdtLIO(preintegration)/ndt_inc.h"
+#include "common/math_utils.h"
 #include <glog/logging.h>
 #include <set>
 #include <execution>
@@ -29,7 +29,15 @@ void NdtInc2d::addScan( std::shared_ptr<Frame> frame ){
         if ( iter == grids_.end()) {  // 栅格不存在
             data_.push_front( {key, {pt}} );
             grids_.insert( {key, data_.begin()} );
-            
+
+            // if ( data_.size() >= opts_.capacity_ ) {
+            // 如果容量太小，小于一批数据, 那么在同一批数据中插入后又被淘汰, 
+            // 导致 activate_voxels 包含已删除的键, 在最后的 std::for_each 中会访问这个已经被删除的 key 导致 updateVoxel 报错
+            //     // 删除最旧的体素（LRU策略）
+            //     // 删除一个尾部数据
+            //     grids_.erase(data_.back().first);
+            //     data_.pop_back();
+            // }
         } else {  // 栅格存在，添加点，更新缓存
             iter->second->second.addPoint(pt);
             // 移动到链表头部（表示最近使用）
@@ -42,19 +50,21 @@ void NdtInc2d::addScan( std::shared_ptr<Frame> frame ){
 
     // 更新 active_voxels
     std::for_each(std::execution::par_unseq, activate_voxels.begin(), activate_voxels.end(),
-        [this](const auto & key) { updateVoxel(grids_[key]->second, first_scan_); });
+        [this](const auto & key) { updateVoxel(grids_[key]->second); });
     first_scan_ = false;
-
+    
+    // update 之后再修改, 防止出现注释中的问题
     while ( data_.size() >= opts_.capacity_ ) {
+        // 如果容量太小，小于一批数据, 那么在同一批数据中插入后又被淘汰, 
+        // 导致 activate_voxels 包含已删除的键, 在最后的 std::for_each 中会访问这个已经被删除的 key 导致 updateVoxel 报错
         grids_.erase(data_.back().first);  // // 删除最旧的体素（LRU策略）
         data_.pop_back();   //// 删除一个尾部数据
     }
 }
 
-
-bool NdtInc2d::alignNdt( SE2 & init_pose ){
+bool NdtInc2d::alignNdt(SE2 & init_pose){
     if (grids_.empty()) {
-        LOG(WARNING) << "No grids available for alignment!";
+        // LOG(WARNING) << "No grids available for alignment!";
         return false;
     }
 
@@ -94,7 +104,7 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
                 if (it != grids_.end() && it->second->second.ndt_estimated_) {
                     auto& v = it->second->second;  // voxel
                     Vec2d e = qs - v.mu_;
-                    // check chi2 th 内点, 这里内点非常少
+                    // check chi2 th
                     // 马氏距离检查（异常值剔除）
                     double mahalanobis  = e.transpose() * v.info_ * e;
                     if ( std::isnan(mahalanobis ) || mahalanobis  > opts_.res_outlier_th_) {
@@ -121,7 +131,7 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
             }
         });
         // 累加Hessian和error,计算dx
-        // double total_res = 0;
+        double total_res = 0;
         int effective_num = 0;
         Mat3d H = Mat3d::Zero();
         Vec3d err = Vec3d::Zero();
@@ -131,7 +141,7 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
                 continue;
             }
 
-            // total_res += errors[idx].transpose() * infos[idx] * errors[idx];
+            total_res += errors[idx].transpose() * infos[idx] * errors[idx];
             effective_num++;
 
             H += jacobians[idx].transpose() * infos[idx] * jacobians[idx];
@@ -140,7 +150,7 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
 
         // 检查有效点数
         if (effective_num < opts_.min_effective_pts_) {
-            // LOG(WARNING) << "effective num too small: " << effective_num;
+            LOG(WARNING) << "effective num too small: " << effective_num;
             init_pose = pose;
             return false;
         }
@@ -154,14 +164,14 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
             break;
         }
     }
-
     init_pose = pose;
     return true;
 }
 
+
 void NdtInc2d::conputeResidualAndJacobians( const SE2 & input_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r ){
-    if (grids_.empty() || source_ == nullptr) {
-        LOG(WARNING) << "No grids available for alignment! or source_ is nullptr!";
+    if (grids_.empty()) {
+        LOG(WARNING) << "No grids available for alignment!";
         return;
     }
 
@@ -243,8 +253,8 @@ void NdtInc2d::conputeResidualAndJacobians( const SE2 & input_pose, Mat8d & HT_V
     // LOG(INFO) << "effective: " << effective_num;
 }
 
-void NdtInc2d::updateVoxel(Voxel & v, bool & first_scan_flag){
-    if ( first_scan_flag ) {
+void NdtInc2d::updateVoxel(Voxel & v){
+    if (first_scan_) {
         // 第一帧：简单估计
         if (v.pts_.size() > 1) {
             math::ComputeMeanAndCov(v.pts_, v.mu_, v.sig_, [this](const Vec2d & p) { return p; } );
@@ -256,6 +266,7 @@ void NdtInc2d::updateVoxel(Voxel & v, bool & first_scan_flag){
         }
         v.ndt_estimated_ = true;
         v.pts_.clear();
+
         return;
     }
 

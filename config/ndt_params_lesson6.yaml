@@ -1,0 +1,64 @@
+main:
+  bag_path: /home/lrj/lidar_slam/data/ch6/lesson6
+  # bag_path: /home/lrj/lidar_slam/data/ch6/data3   # 多回波
+  multi_scan: false # 多回波 true
+  laser_topic: /front_scan  # /pavo_scan_bottom   # floor4_ros 数据集要去掉前面的 /horizontal_laser_2d
+  imu_topic: /imu # /ivsensorimu
+
+  odom_topic: /robotvel   # ieskf 加了轮速计之后就不怎么发散了
+  with_imu: 1   # 0: LO | 1:eskf LIO | 2:ieskf LIO | 3: imu preintegration LIO
+  save_map: true
+  display_maxsize: 1000   # 显示全局地图最大像素
+frontend:
+  kf_distance: 0.25   # default = 0.25
+  kf_angle_deg: 45.0  # default = 30.0
+  kf_add_scan_in_occu: 1 # 10个关键 scan 放入一次 occupancy map
+  max_distance: 1000.0     # 最远 10m
+  angle_boarder: 90.0
+  imu_states_buffer_size: 20   # 去畸变的imu数据缓存
+  display: true
+ndt:
+  max_iter: 50           # 最大迭代次数
+  voxel_size: 1.0        # 体素大小   单位 m / voxel   default = 0.5
+  min_effective_pts: 10  # 最近邻点数阈值   default = 10
+  min_pts_in_voxel: 10   # 每个栅格中最小点数  default = 10
+  max_pts_in_voxel: 50   # 每个栅格中最大点数
+  eps: 1e-3              # 通常取体素大小的1% 默认-1在程序中计算
+  res_outlier_th: 5.661  # 卡方检验阈值（95%置信度）  基于马氏距离的卡方检验阈值。
+  capacity: 100000         # 缓存的体素数量
+  normalizing_factor: 1e-3  # 正则化因子
+  init_info: 1e3         # 初始化 voxel 信息矩阵
+  nearby_type: 2         # 0:center | 1:4 | 2:8 (default)
+occupancy_map:
+  closest_th: 0.1         #  近距离阈值
+  endpoint_close_th: 0.1  #  末端点障碍物近距离阈值
+  resolution: 20.0        #  1m 多少像素  default=20.0
+  image_size: 1000        #  图像大小
+  method: 0               #  0:BRESENHAM(default) | 1:MODEL_POINTS
+  model_size: 400         #  模板像素大小
+
+imu:
+  imu_dt: 0.01   # 0.02s 即 50Hz   检查时间戳用的
+  # 噪声设为负数，系统在 10s静止期间自动计算
+  gyro_var: -1
+  acce_var: -1
+  bias_gyro_var: -1
+  bias_acce_var: -1
+  odom_var: -1  # 轮速计噪声   正数则在预积分中加入 odom 观测
+  eskf:
+    lidar_pos_noise: 0.01
+    lidar_ang_noise: 0.01 # 1 x pi / 180 = 0.01745329251994329576923690768489
+
+  ieskf:    # 不会调, 经常发散
+    num_iterations: 10 # 迭代次数
+    eps: 1e-3          # 终止迭代的dx大小
+    info_ratio: 0.01    # 每个点反馈的info因子
+    update_bias_gyro: false   # 迭代过程中是否更新 bg
+    update_bias_acce: false   # 迭代过程中是否更新 ba
+
+  preintegration:
+    ndt_pos_noise: 0.01      # NDT位置方差
+    ndt_ang_noise: 0.01      # NDT角度方差
+    update_bias_gyro: false
+    update_bias_acce: false  # 容易发散
+    info_wright: 0.01

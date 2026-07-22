@@ -1,13 +1,14 @@
 #ifndef __ESKF_H
 #define __ESKF_H
 
-#include "../common/eigen_types.h"
-#include "../common/imu.h"
-#include "../common/odom.h"
+#include "common/eigen_types.h"
+#include "common/imu.h"
+#include "common/odom.h"
+#include "common/math_utils.h"
 
 namespace sad {
 /**
- * states: px, py, vx, vy, theta, bg, bax, bay  8d getNominal
+ * states: px, py, vx, vy, theta, bg, bax, bay  8d
  */
 class ESKF {
 public:
@@ -26,7 +27,7 @@ public:
 
         /// Lidar 观测噪声
         double lidar_pos_noise_ = 0.1;                   // Lidar 位置噪声
-        double lidar_ang_noise_ = 0.1 * M_PI/180.0;  // Lidar 旋转噪声
+        double lidar_ang_noise_ = 0.1 * math::kDEG2RAD;  // Lidar 旋转噪声
 
         /// 其他配置
         bool update_bias_gyro_ = true;  // 是否更新陀螺bias
@@ -37,18 +38,38 @@ public:
 
     SE2 getNominalPose() const { return SE2( SO2(theta_), p_ ); }
     Vec8d getNominal();
-    double getDtheta() { return dtheta_; };
 
+    /**
+     * 设置初始条件
+     * @param opts 噪声
+     * @param init_bg z 轴 gryo bias
+     * @param init_ba x y 轴 acc bias
+     */
     void setInitCondition( const Options & opts, const double & init_bg, const Vec2d & init_ba );
-    void setSE2( SE2 pose ) { p_ = pose.translation(); theta_ = pose.so2().log(); }
+
+    /**
+     * 设置名义状态变量
+     */
     void setX( Vec2d p, Vec2d v, double theta, double bg, Vec2d ba, double timestamp );
 
+    /// @brief IMU 递推
+    /// @param imu 
+    /// @return 
     bool predict( const IMUPtr imu );
+
+    /// @brief 编码器轮速计观测
+    /// @param odom
+    /// @return 
     bool observeOdom( const std::shared_ptr<Odom> odom );
+
+    /// @brief lidar 观测
+    /// @param lidar
+    /// @return 
     bool observeLidar( const SE2 pose );
 
-private:
     void updateAndReset();
+
+private:
     void buildNoise();
 
 private:
@@ -78,8 +99,7 @@ private:
 
     // 协方差矩阵
     Mat8d P_ = Mat8d::Identity();
-  
-    double dtheta_ = 0.0;
+
     double last_timestamp_ = 0.0;
     bool first_lidar_ = true;
 

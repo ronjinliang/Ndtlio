@@ -1,12 +1,11 @@
 #ifndef __NDT_INC_H
 #define __NDT_INC_H
 
-#include "../common/eigen_types.h"
-
-#include "../include/frame.h"
+#include "common/eigen_types.h"
+#include "common/lidar_utils.h"
+#include "2dNdtLIO(preintegration)/frame.h"
 
 #include <list>
-#include <mutex>
 
 namespace sad {
 
@@ -82,6 +81,8 @@ public:
     /// 使用gauss-newton方法进行ndt配准, LO 或者松耦合 LIO 使用
     bool alignNdt( SE2 & init_pose );
 
+    const std::unordered_map<KeyType, std::list<KeyAndVoxel>::iterator, hash_vec<2>> & getGrid() { return grids_; }
+
     /**
      * 计算给定Pose下的雅可比和残差矩阵，符合IEKF中符号（8.17, 8.19）
      * 实现紧耦合 IESKF LIO
@@ -93,23 +94,28 @@ public:
 
 private:
     //// 更新 voxel 内部数据，根据新加入的 pts 和历史估计情况来确定自己的估计
-    void updateVoxel(Voxel & v, bool & first_scan_flag);
+    void updateVoxel(Voxel & v);
     /// 根据最近邻的类型，生成附近网格
     void generateNearbyGrids();
 
 private:
     Options opts_;
     std::shared_ptr<Frame> source_ = nullptr;
-    std::vector<KeyType> nearby_grids_;     // 附近的栅格
 
+    std::list<KeyAndVoxel> data_;                      // 缓存数据
     // 哈希表：
     // 1.键（KeyType）：体素索引
     // 2.值（std::list<KeyAndVoxel>::iterator）：指向一个链表（std::list）中元素的迭代器。
     // 3.哈希函数（hash_vec<2>）：因为键是Vec2i（Eigen::Vector2i），需要自定义哈希函数。hash_vec<2>是一个模板类，用于生成二维向量的哈希值
     // grids_只存储索引到迭代器的映射
-    std::list<KeyAndVoxel> data_;                      // 缓存数据
     std::unordered_map<KeyType, std::list<KeyAndVoxel>::iterator, hash_vec<2>> grids_;  // 栅格数据，存储真实数据的迭代器
+    std::vector<KeyType> nearby_grids_;     // 附近的栅格
+
     bool first_scan_ = true;  // 首帧点云特殊处理
+    double angle_min_ = 0.0;
+    double angle_max_ = 2*M_PI;
+    double range_min_ = 0.01;
+    double range_max_ = 200.0;
 };
 
 }

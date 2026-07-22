@@ -1,9 +1,10 @@
 #ifndef __IESKF_H
 #define __IESKF_H
 
-#include "../common/eigen_types.h"
-#include "../common/imu.h"
-#include "../common/odom.h"
+#include "common/eigen_types.h"
+#include "common/imu.h"
+#include "common/odom.h"
+#include "common/math_utils.h"
 
 namespace sad {
 /**
@@ -34,9 +35,15 @@ public:
 
     };
 
+    /**
+     * 
+     */
     IESKF(Options opts);
 
     SE2 getNominalPose() const { return SE2(SO2(theta_), p_); }
+    /**
+     * 获取名义状态
+     */
     Vec8d getNominal();
 
     /**
@@ -47,7 +54,9 @@ public:
      */
     void setInitCondition( const Options & opts, const double & init_bg, const Vec2d & init_ba );
 
-    void setSE2( SE2 pose ) { p_ = pose.translation(); theta_ = pose.so2().log(); }
+    /**
+     * 设置名义状态变量
+     */
     void setX( Vec2d p, Vec2d v, double theta, double bg, Vec2d ba, double timestamp );
 
     /// @brief IMU 递推
