@@ -1,5 +1,5 @@
-#include "2dNdtLIO/include/ndt_inc.h"
-#include "2dNdtLIO/common/math_utils.h"
+#include "../include/ndt_inc.h"
+#include "../common/math_utils.h"
 #include <glog/logging.h>
 #include <set>
 #include <execution>
@@ -29,13 +29,7 @@ void NdtInc2d::addScan( std::shared_ptr<Frame> frame ){
         if ( iter == grids_.end()) {  // 栅格不存在
             data_.push_front( {key, {pt}} );
             grids_.insert( {key, data_.begin()} );
-
-            // if ( data_.size() >= opts_.capacity_ ) {
-            //     // 如果容量太小，小于一批数据, 那么在同一批数据中插入后又被淘汰, 
-            //     // 导致 activate_voxels 包含已删除的键, 在最后的 std::for_each 中会访问这个已经被删除的 key 导致 updateVoxel 报错
-            //     grids_.erase(data_.back().first);  // // 删除最旧的体素（LRU策略）
-            //     data_.pop_back();   //// 删除一个尾部数据
-            // }
+            
         } else {  // 栅格存在，添加点，更新缓存
             iter->second->second.addPoint(pt);
             // 移动到链表头部（表示最近使用）
@@ -51,73 +45,14 @@ void NdtInc2d::addScan( std::shared_ptr<Frame> frame ){
         [this](const auto & key) { updateVoxel(grids_[key]->second, first_scan_); });
     first_scan_ = false;
 
-    // update 之后再修改, 防止出现注释中的问题
     while ( data_.size() >= opts_.capacity_ ) {
-        // 如果容量太小，小于一批数据, 那么在同一批数据中插入后又被淘汰, 
-        // 导致 activate_voxels 包含已删除的键, 在最后的 std::for_each 中会访问这个已经被删除的 key 导致 updateVoxel 报错
         grids_.erase(data_.back().first);  // // 删除最旧的体素（LRU策略）
         data_.pop_back();   //// 删除一个尾部数据
     }
 }
 
-/// @brief 回环检测使用这个
-/// @param frame 
-void NdtInc2d::addScanInGridsBuffer( std::vector<std::shared_ptr<Frame>> frames ){
-    std::unique_lock<std::mutex> lock(lc_buffer_mutex_);
-    for ( auto & frame : frames ) {  // 遍历所有回环传进来的帧
-        std::set<KeyType, less_vec<2>> activate_voxels;       // 记录那些 voxel 被更新
-        std::vector<Vec2d> out_scan;
-        out_scan.resize(frame->pts_.size());
-
-        // 转换到世界坐标
-        std::vector<int> index(frame->pts_.size());
-        for (int i = 0; i < frame->pts_.size(); ++i) index[i] = i;
-        std::for_each(std::execution::par_unseq, index.begin(), index.end(),
-            [&]( int & idx ){ out_scan[idx] = frame->pose_ * frame->pts_[idx]; });
-
-        for ( const auto & pt : out_scan ) {
-            // 使用体素分辨率计算索引
-            KeyType key = (pt * opts_.inv_voxel_size_).array().round().cast<int>();
-            auto iter = lc_grids_.find(key);
-            if ( iter == lc_grids_.end()) {  // 栅格不存在
-                lc_data_.push_front( {key, {pt}} );
-                lc_grids_.insert( {key, lc_data_.begin()} );
-
-                if ( lc_data_.size() >= opts_.capacity_ ) {
-                    // 删除最旧的体素（LRU策略）
-                    // 删除一个尾部数据
-                    lc_grids_.erase(lc_data_.back().first);
-                    lc_data_.pop_back();
-                }
-            } else {  // 栅格存在，添加点，更新缓存
-                iter->second->second.addPoint(pt);
-                // 移动到链表头部（表示最近使用）
-                lc_data_.splice(lc_data_.begin(), lc_data_, iter->second);  // 更新的那个放到最前
-                // 更新迭代器（因为移动后迭代器可能失效）
-                iter->second = lc_data_.begin();   // grids 时也指向最前
-            }
-            activate_voxels.emplace(key);
-        }
-        // 更新 active_voxels
-        std::for_each(std::execution::par_unseq, activate_voxels.begin(), activate_voxels.end(),
-            [this](const auto & key) { updateVoxel(lc_grids_[key]->second, lc_first_scan_); });
-        lc_first_scan_ = false;
-    }
-    has_new_grids_.store(true);
-}
 
 bool NdtInc2d::alignNdt( SE2 & init_pose ){
-    // 回环成功重新构建新的 NDT，这里上锁更换，其他访问 NDT 的地方都上了锁
-    if ( has_new_grids_.load() ) {
-        std::scoped_lock lock(data_mutex_, lc_buffer_mutex_);  // 同时上锁, display 和 looc closure
-        data_.clear();
-        grids_.clear();
-        data_  = std::move(lc_data_);
-        grids_ = std::move(lc_grids_);
-        lc_first_scan_ = true;
-        has_new_grids_.store(false);
-    }
-
     if (grids_.empty()) {
         LOG(WARNING) << "No grids available for alignment!";
         return false;
@@ -224,29 +159,7 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
     return true;
 }
 
-const std::vector<Vec2d> NdtInc2d::getVoxels(){
-    // 上锁防止访问的时候，前端正在更换 grids
-    std::unique_lock<std::mutex> lock(data_mutex_);
-    std::vector<Vec2d> voxels;
-    voxels.reserve(grids_.size());
-    for ( const auto & kv : grids_ ){
-        voxels.emplace_back(kv.second->second.mu_);
-    }
-    return voxels;
-}
-
 void NdtInc2d::conputeResidualAndJacobians( const SE2 & input_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r ){
-    // 回环成功重新构建新的 NDT，这里上锁更换，其他访问 NDT 的地方都上了锁
-    if ( has_new_grids_.load() ) {
-        std::scoped_lock lock(data_mutex_, lc_buffer_mutex_);  // 同时上锁, display 和 looc closure
-        data_.clear();
-        grids_.clear();
-        data_  = std::move(lc_data_);
-        grids_ = std::move(lc_grids_);
-        lc_first_scan_ = true;
-        has_new_grids_.store(false);
-    }
-
     if (grids_.empty() || source_ == nullptr) {
         LOG(WARNING) << "No grids available for alignment! or source_ is nullptr!";
         return;

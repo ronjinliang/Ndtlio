@@ -13,7 +13,7 @@
 #include <map>
 #include <numeric>
 #include <opencv2/core.hpp>
-#include "2dNdtLIO/common/eigen_types.h"
+#include "../common/eigen_types.h"
 
 /// 常用的数学函数
 namespace sad::math {

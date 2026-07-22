@@ -1,9 +1,8 @@
-#include "2dNdtLIO/include/frontend.h"
+#include "../include/frontend.h"
 
 #include <yaml-cpp/yaml.h>
 #include <glog/logging.h>
 #include <execution>
-#include <opencv2/opencv.hpp>
 
 namespace sad {
 
@@ -30,7 +29,7 @@ bool Frontend::processScan( Scan2d::Ptr scan ){
         
         if ( eskf_ ) {  // eskf
             // ESKF 先验(初值)
-            current_frame_->pose_ = eskf_->getNominalPose();  // 有点不是特别稳定
+            current_frame_->pose_ = eskf_->getNominalPose();
             map_->matchScan(current_frame_);  // 先匹配后融合   雷达坐标系
             eskf_->observeLidar(current_frame_->pose_);
             current_frame_->pose_ = eskf_->getNominalPose();
@@ -48,41 +47,11 @@ bool Frontend::processScan( Scan2d::Ptr scan ){
         motion_guess_ = last_frame_pose_.inverse() * current_frame_->pose_;  // T_l1w * T_wl2 = T_l1l2
     }
 
-    // 一定要更新前端的帧, 不然可能会导致轨迹出现断续
-    // 在这里更新才不会导致 last_update_kf_id != ( frames_.size() - 1 ) 的问题 也就是回环更新完 kf 之后正好又来了一个 kf，这个 kf 在 last_update_kf_id 之后
-    size_t last_update_kf_id = 0;
-    if ( loopClosure_ && loopClosure_->loopSuccess( last_update_kf_id ) ) {
-        // 在 isKeyFrame 里面计算 delta_pose_with_kf_ 判断是不是 kf
-        // current_frame_->pose_ = map_->getKf( last_update_kf_id )->pose_ * delta_pose_with_kf_ * motion_guess_; // T_w_l2 = T_w_l1 * T_l1_l2
-        // cur f pose = last kf * delta [last kf & last f]
-
-        // current_frame_->pose_ = map_->getKf( last_update_kf_id )->pose_ * delta_pose_with_kf_;
-        // if ( eskf_ ) eskf_->setSE2(current_frame_->pose_);
-        // else if ( ieskf_ ) ieskf_->setSE2(current_frame_->pose_);
-        
-        current_frame_->pose_ = map_->getKf( last_update_kf_id )->pose_ * delta_pose_with_kf_;
-        if ( eskf_ )  {
-            eskf_->observeLidar(current_frame_->pose_);
-            current_frame_->pose_ = eskf_->getNominalPose();
-        } else if ( ieskf_ ) {
-            ieskf_->setSE2(current_frame_->pose_);
-            ieskf_->updateUsingCustomObserve([this](const SE2 &input_pose, Mat8d &HTVH, Vec8d &HTVr) {
-                map_->getNdt().conputeResidualAndJacobians(input_pose, HTVH, HTVr);});
-            current_frame_->pose_ = ieskf_->getNominalPose();
-        }
-    }
-
     // 执行关键帧的操作
     is_keyframe_ = isKeyFrame();
     if ( is_keyframe_ ) {
         addKeyFrame(scan);  // scan 放入 occupancy map 和 ndt
-        if ( loopClosure_ ) {
-            loopClosure_->addNewFrame( current_frame_ );
-        }
     }
-
-    // 刷新显示
-    if ( display_ ) display_->updateCurrentFrame(current_frame_);
 
     last_frame_pose_ = current_frame_->pose_;
     return true;
@@ -109,7 +78,7 @@ bool Frontend::processOdom( const std::shared_ptr<Odom> odom ){
     }
 }
 
-void Frontend::undistortAndGeneratePoints( Scan2d::Ptr scan ){
+void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
     SE2 T_end = SE2();
     if ( eskf_ ) {
         T_end = eskf_->getNominalPose();
@@ -156,49 +125,57 @@ void Frontend::undistortAndGeneratePoints( Scan2d::Ptr scan ){
     }
 }
 
-inline bool Frontend::poseInterp(double query_time, double last_time, SE2 & result, float time_th ){
-    if ( query_time > last_time ) {
-        if (query_time < (last_time + time_th)) {
-            // 尚可接受
+inline bool Frontend::poseInterp(double query_time, double last_time, SE2 & result, float time_th) {
+    if (imu_states_.empty()) return false;
+
+    // 1. 查询时间晚于最新状态的处理（短暂外推）
+    if (query_time > last_time) {
+        if (query_time < last_time + time_th) {
             result = imu_states_.rbegin()->second;
             return true;
         }
         return false;
     }
 
-    auto match_iter = imu_states_.begin();
-    for (auto iter = imu_states_.begin(); iter != imu_states_.end(); ++iter) {
-        auto next_iter = iter;
-        ++next_iter;
-        if ( iter->first < query_time && next_iter->first >= query_time) {
-            match_iter = iter;
-            break;
-        }
-    }
-
-    auto match_iter_n = match_iter;
-    ++match_iter_n;
-
-    double dt = match_iter_n->first - match_iter->first;
-    double s = (query_time - match_iter->first) / dt;   // s=0 时为第一帧，s=1时为next
-    // 出现了 dt为0的bug
-    if (fabs(dt) < 1e-6) {
-        result = match_iter->second;
+    // 2. 边界保护：早于或等于最早状态
+    if (query_time <= imu_states_.begin()->first) {
+        result = imu_states_.begin()->second;
         return true;
     }
-    SE2 pose_first = match_iter->second;
-    SE2 pose_next = match_iter_n->second;
-    // 角度需要考虑周期
-    double theta_first = pose_first.so2().log();
-    double theta_next  = pose_next.so2().log();
-    double delta_angle = theta_next - theta_first;
-    if ( delta_angle > M_PI)   delta_angle -= 2*M_PI;
-    if ( delta_angle < -M_PI ) delta_angle += 2*M_PI;
-    // 平移插值
-    double interp_angle = theta_first + s * delta_angle;
 
-    Vec2d interp_t = pose_first.translation() * (1-s) + pose_next.translation() * s;
-    result = SE2( interp_angle, interp_t );
+    // 3. 定位到包含 query_time 的区间 [iter->first, next_iter->first]
+    auto iter = imu_states_.begin();
+    auto next_iter = std::next(iter);
+    while (next_iter != imu_states_.end() && next_iter->first < query_time) {
+        ++iter;
+        ++next_iter;
+    }
+
+    // 安全保护：若未找到（理论上不会），回退到最近的状态
+    if (next_iter == imu_states_.end()) {
+        result = iter->second;
+        return true;
+    }
+
+    const double dt = next_iter->first - iter->first;
+    if (dt < 1e-6) {
+        result = iter->second;
+        return true;
+    }
+
+    double s = (query_time - iter->first) / dt;
+    s = std::clamp(s, 0.0, 1.0);   // 防止数值微小越界
+
+    const SE2& T_a = iter->second;
+    const SE2& T_b = next_iter->second;
+
+    // 4. 李代数插值：result = T_a * exp(s * log(T_a^{-1} * T_b))
+    SE2 relative = T_a.inverse() * T_b;
+
+    auto log_rel = relative.log();        // 3维向量，例如 Eigen::Vector3d
+    log_rel *= s;
+    SE2 delta = SE2::exp(log_rel);
+    result = T_a * delta;
     return true;
 }
 
@@ -222,7 +199,8 @@ void Frontend::addKeyFrame(Scan2d::Ptr scan){
     current_frame_->keyframe_id_ = keyframe_id_ ++;
     map_->addKeyframe(current_frame_);
     map_->addScanInNdt(current_frame_);
-    if ( (keyframe_id_ % (opts_.kf_add_scan_in_occu_+1)) == 0 ) {
+    // 定位模式不用构建占据图
+    if ( opts_.localization_mode_ == false && (keyframe_id_ % (opts_.kf_add_scan_in_occu_+1)) == 0 ) {
         map_->addScanInOccupancyMap(current_frame_);  // 每x关键帧放一次
     }
     last_keyframe_ = current_frame_;

@@ -1,18 +1,18 @@
-#include "2dNdtLIO/include/incrementalNDTLO.h"
+#include "../include/incrementalNDTLO.h"
 #include <yaml-cpp/yaml.h>
 #include <glog/logging.h>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
-#include <fstream>
 
 namespace sad {
 
-IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu, bool with_display, bool with_loopClosure ) {
+IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu ) {
     YAML::Node config = YAML::LoadFile(fileName);
 
     // 前端
     Frontend::Options frontend_opts;
+    frontend_opts.localization_mode_      = config["main"]["localization_mode"].as<bool>();
     frontend_opts.kf_distance_            = config["frontend"]["kf_distance"].as<double>();
     frontend_opts.kf_angle_deg_           = config["frontend"]["kf_angle_deg"].as<double>();
     frontend_opts.kf_angle_rad_           = frontend_opts.kf_angle_deg_ * M_PI / 180.;
@@ -33,7 +33,7 @@ IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu, 
     if ( map_opts.ndt_opts_.eps_ < 0. ) map_opts.ndt_opts_.eps_ = map_opts.ndt_opts_.voxel_size_ * 1e-2;  // 1%
     map_opts.ndt_opts_.res_outlier_th_      = config["ndt"]["res_outlier_th"].as<double>();
     map_opts.ndt_opts_.capacity_            = config["ndt"]["capacity"].as<int>();
-    int nearby_type                = config["ndt"]["nearby_type"].as<int>();
+    int nearby_type                         = config["ndt"]["nearby_type"].as<int>();
     map_opts.ndt_opts_.normalizing_factor_  = config["ndt"]["normalizing_factor"].as<double>();
     map_opts.ndt_opts_.init_info_           = config["ndt"]["init_info"].as<double>();
     if      ( nearby_type == 0 ) map_opts.ndt_opts_.nearby_type_ = NdtInc2d::NearbyType::CENTER;
@@ -60,40 +60,17 @@ IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu, 
         frontend_->setIESKF(ieskf_);
     }
 
-    if ( with_display ) {
-        display_ = std::make_shared<Display>( config["main"]["display_maxsize"].as<int>() );
-        display_->setMap(map_);
-        frontend_->setDisplay(display_);
-    }
-
-    // 回环检测
-    if ( with_loopClosure ) {
-        LoopClosure::Options loop_closure_opts;
-        loop_closure_opts.debug_fout_                   = config["loop_closure"]["loop_txt"].as<std::string>();
-        loop_closure_opts.enable_global_optimization_   = config["loop_closure"]["enable_global_optimization"].as<bool>();
-        loop_closure_opts.max_opti_iter_                = config["loop_closure"]["max_opti_iter"].as<int>();
-        loop_closure_opts.candidate_distance_th_        = config["loop_closure"]["candidate_distance_th"].as<float>();
-        loop_closure_opts.loop_closure_gap_             = config["loop_closure"]["loop_closure_gap"].as<int>();
-        loop_closure_opts.frame_gap_                    = config["loop_closure"]["frame_gap"].as<int>();
-        loop_closure_opts.loop_rk_delta_                = config["loop_closure"]["loop_rk_delta"].as<float>();
-        loop_closure_opts.all_constraints_info_weight_  = config["loop_closure"]["all_constraints_info_weight"].as<double>();
-        loop_closure_opts.loop_constraints_info_weight_ = config["loop_closure"]["loop_constraints_info_weight"].as<double>();
-        loop_closure_opts.num_frames_add_in_new_ndt_    = config["loop_closure"]["num_frames_add_in_new_ndt"].as<int>();
-        loop_closure_opts.multi_ndt_resolution_         = config["loop_closure"]["multi_ndt_resolution"].as<std::vector<float>>();
-        loop_closure_opts.left_can_id_                  = config["loop_closure"]["left_can_id"].as<int>();
-        loop_closure_opts.right_can_id_                 = config["loop_closure"]["right_can_id"].as<int>();
-        loopClosure_ = std::make_shared<LoopClosure>( std::move(loop_closure_opts) );
-        loopClosure_->setMap(map_);
-        frontend_->setLoopClosure(loopClosure_);
-    }
-
     imu_dt_                 = config["imu"]["imu_dt"].as<double>();
+    ba_                     = Vec2d(config["imu"]["bax"].as<double>(), config["imu"]["bay"].as<double>());
+    bg_                     = config["imu"]["bg"].as<double>();
     
     gyro_var_               = config["imu"]["gyro_var"].as<double>();
     acce_var_               = config["imu"]["acce_var"].as<double>();
     bias_gyro_var_          = config["imu"]["bias_gyro_var"].as<double>();
     bias_acce_var_          = config["imu"]["bias_acce_var"].as<double>();
     odom_var_               = config["imu"]["odom_var"].as<double>();
+    update_bias_gyro_       = config["imu"]["update_bias_gyro"].as<bool>();
+    update_bias_acce_       = config["imu"]["update_bias_acce"].as<bool>();
 
     eskf_lidar_pos_noise_   = config["imu"]["eskf"]["lidar_pos_noise"].as<double>();
     eskf_lidar_ang_noise_   = config["imu"]["eskf"]["lidar_ang_noise"].as<double>();
@@ -101,23 +78,9 @@ IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu, 
     ieskf_num_iterations_   = config["imu"]["ieskf"]["num_iterations"].as<int>();
     ieskf_eps_              = config["imu"]["ieskf"]["eps"].as<double>();
     ieskf_info_ratio_       = config["imu"]["ieskf"]["info_ratio"].as<double>();
-    ieskf_update_bias_gyro_ = config["imu"]["ieskf"]["update_bias_gyro"].as<bool>();
-    ieskf_update_bias_acce_ = config["imu"]["ieskf"]["update_bias_acce"].as<bool>();
-
-    display_maxsize_        = config["main"]["display_maxsize"].as<int>();
 }
 
 IncrementalNDTLO::~IncrementalNDTLO(){
-    if ( display_ ) display_->close();
-    if ( loopClosure_ ) loopClosure_->close();
-
-    // std::ofstream debug_fout("/home/lrj/lidar_slam/src/2dNdtLIO/map/keyframes.txt");
-    // auto kfs = map_->getAllFrames();
-    // debug_fout << "id x y theta" << std::endl;
-    // for ( auto & kf : kfs ) {
-    //     debug_fout << kf.first << ", " << kf.second->pose_.log().transpose() << std::endl;
-    // }
-    // debug_fout.close();
 }
 
 bool IncrementalNDTLO::initIMU( IMUPtr imu ){
@@ -143,8 +106,8 @@ bool IncrementalNDTLO::initIMU( IMUPtr imu ){
         //     static_imu_init_.GetInitBa()(1) + static_imu_init_.GetGravity()(1));
         
         // 自己的数据集直接设定  origincar3 数据集没有停10s
-        double bg = -0.0270514;
-        Vec2d ba = Vec2d(-0.0506324, 0.453892);
+        Vec2d ba = ba_;
+        double bg = bg_;
 
         LOG(INFO) << "gyro var: " << gyro_var << ", acce var: " << acce_var 
                 << ", bias gyro var: " << bias_gyro_var << ", bias acce var: " << bias_acce_var
@@ -160,6 +123,8 @@ bool IncrementalNDTLO::initIMU( IMUPtr imu ){
             opts.odom_var_        = odom_var_;
             opts.lidar_pos_noise_ = eskf_lidar_pos_noise_;
             opts.lidar_ang_noise_ = eskf_lidar_ang_noise_;
+            opts.update_bias_gyro_ = update_bias_gyro_;
+            opts.update_bias_acce_ = update_bias_acce_;
             eskf_->setInitCondition(opts, bg, ba);
             LOG(INFO) << "ESKF: imu init finished.";
         } else if ( ieskf_ ) {
@@ -175,8 +140,8 @@ bool IncrementalNDTLO::initIMU( IMUPtr imu ){
             opts.bias_acce_var_  = bias_acce_var;
 
             opts.odom_var_         = odom_var_;
-            opts.update_bias_gyro_ = ieskf_update_bias_gyro_;
-            opts.update_bias_acce_ = ieskf_update_bias_acce_;
+            opts.update_bias_gyro_ = update_bias_gyro_;
+            opts.update_bias_acce_ = update_bias_acce_;
 
             ieskf_->setInitCondition(opts, bg, ba);
             LOG(INFO) << "IESKF: imu init finished.";

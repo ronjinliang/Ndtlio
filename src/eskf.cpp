@@ -1,4 +1,4 @@
-#include "2dNdtLIO/include/eskf.h"
+#include "../include/eskf.h"
 #include <glog/logging.h>
 
 namespace sad {
@@ -75,7 +75,8 @@ bool ESKF::predict( const IMUPtr imu ){
     if ( imu->acce_.z() < 2.0 ) {  // 针对归一化之后的数据
         a *= 9.82;
     }
-    double dg = ( imu->gyro_.z() - bg_ ) * dt;
+    dtheta_ = imu->gyro_.z() - bg_;
+    double dg = dtheta_ * dt;
 
     // 1. 名义状态预测（非线性积分）
     // nominal state 名义状态积分，先用副本是防止更新过程中用到了 k+1 时刻的值，也就是预测之后的
