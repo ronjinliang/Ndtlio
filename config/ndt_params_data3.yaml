@@ -1,0 +1,70 @@
+main:
+  bag_path: /home/lrj/lidar_slam/data/ch6/data3
+  laser_topic: horizontal_laser_2d
+  imu_topic: imu
+  odom_topic: odom
+  with_imu: 2   # 0: LO | 1:eskf LIO | 2:ieskf LIO
+  with_display: true
+  with_loopClosure: true
+  display_maxsize: 1000   # 显示全局地图最大像素
+  save_map: true
+  delay_time: 1   # ms 延时的话, 回环更充分
+frontend:
+  kf_distance: 0.2   # default = 0.2
+  kf_angle_deg: 5.0  # default = 30.0
+  kf_add_scan_in_occu: 5 # x 个关键 scan 放入一次 occupancy map
+  max_distance: 50.0     # 最远的激光距离   default = 50
+  angle_boarder: 0.0
+  imu_states_buffer_size: 12   # 去畸变的imu数据缓存
+ndt:
+  max_iter: 50           # 最大迭代次数
+  voxel_size: 1.0          # 体素大小   单位 m / voxel   default = 0.7
+  min_effective_pts: 10  # 最近邻点数阈值   default = 10   至少要 10 个有效点
+  min_pts_in_voxel: 10   # 每个栅格中最小点数  default = 10
+  max_pts_in_voxel: 50   # 每个栅格中最大点数
+  eps: 1e-3              # 通常取体素大小的1% 默认-1在程序中计算
+  res_outlier_th: 5.991  # 卡方检验阈值（95%置信度）  基于马氏距离的卡方检验阈值。  default = 5.991
+  capacity: 250         # 缓存的体素数量   default = 250
+  normalizing_factor: 1e-3  # 正则化因子   default = 1e-3
+  init_info: 1e2         # 初始化 voxel 信息矩阵
+  nearby_type: 1         # 0:center | 1:4 | 2:8 (default)
+occupancy_map:
+  closest_th: 0.2         #  近距离阈值
+  endpoint_close_th: 0.1  #  末端点障碍物近距离阈值
+  resolution: 10.0        #  1m 多少像素  default=20.0
+  image_size: 1000        #  图像大小
+
+imu:
+  imu_dt: 0.01   # 0.01s 即 100Hz   检查时间戳用的
+  # 噪声设为负数，系统在 10s静止期间自动计算
+  gyro_var: 2e-1  # deg: 0.226115 | rad: 0.00394645   最好手动调整噪声, 静止测得非常小, 导致imu的占比大, 进而融合的时候会出现一些问题
+  acce_var: 2e-2
+  bias_gyro_var: -1
+  bias_acce_var: -1
+  odom_var: -1  # 轮速计噪声
+  eskf:
+    lidar_pos_noise: 0.1
+    lidar_ang_noise: 0.05 # 1 x pi / 180 = 0.01745329251994329576923690768489
+
+  ieskf:    # 不会调, 经常发散
+    num_iterations: 10 # 迭代次数
+    eps: 1e-3          # 终止迭代的dx大小
+    info_ratio: 0.001    # 每个点反馈的info因子
+    update_bias_gyro: true   # 迭代过程中是否更新 bg
+    update_bias_acce: true   # 迭代过程中是否更新 ba
+
+loop_closure:
+  loop_txt: /home/lrj/lidar_slam/src/2dNdtLIO/map/loop.txt
+  enable_global_optimization: false # 启动全局优化, 感觉除了 candidate 到 current 之外的帧, 没有变化太多
+  left_can_id: -5
+  right_can_id: 5
+  max_opti_iter: 10                 # 最大优化次数
+  candidate_distance_th: 5.0       # candidate frame 与 frame 之间的距离
+  loop_closure_gap: 50             # 要隔至少 x 关键帧再回环, 要考虑更新占据图  default = 10
+  frame_gap: 100                   # current frame 与历史帧的间隔
+  loop_rk_delta: 1.0               # loop closure 的 robust kernel 阈值
+  all_constraints_info_weight: 1e4 # default = 1e6
+  loop_constraints_info_weight: 1
+  num_frame_gap_to_new_occu_map: 10  # 回环之后 隔 x 关键帧放一个进 occupancy map
+  num_frames_add_in_new_ndt: 5     # 回环之后 新添加进 ndt 的帧数量
+  multi_ndt_resolution: [3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.25, 0.1]

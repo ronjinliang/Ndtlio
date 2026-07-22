@@ -1,9 +1,9 @@
 #ifndef __NDT_INC_H
 #define __NDT_INC_H
 
-#include "../common/eigen_types.h"
+#include "2dNdtLIO/common/eigen_types.h"
 
-#include "../include/frame.h"
+#include "2dNdtLIO/include/frame.h"
 
 #include <list>
 #include <mutex>
@@ -78,9 +78,14 @@ public:
 
     /// 在voxel里添加点云
     void addScan( std::shared_ptr<Frame> frame );
+    /// @brief 回环检测调用这个更新体素
+    /// @param frame 
+    void addScanInGridsBuffer( std::vector<std::shared_ptr<Frame>> frames );
 
     /// 使用gauss-newton方法进行ndt配准, LO 或者松耦合 LIO 使用
     bool alignNdt( SE2 & init_pose );
+
+    const std::vector<Vec2d> getVoxels();
 
     /**
      * 计算给定Pose下的雅可比和残差矩阵，符合IEKF中符号（8.17, 8.19）
@@ -98,6 +103,9 @@ private:
     void generateNearbyGrids();
 
 private:
+    std::mutex data_mutex_;        // display 访问用的锁
+    std::mutex lc_buffer_mutex_;   // 回环中使用的锁
+    
     Options opts_;
     std::shared_ptr<Frame> source_ = nullptr;
     std::vector<KeyType> nearby_grids_;     // 附近的栅格
@@ -110,6 +118,13 @@ private:
     std::list<KeyAndVoxel> data_;                      // 缓存数据
     std::unordered_map<KeyType, std::list<KeyAndVoxel>::iterator, hash_vec<2>> grids_;  // 栅格数据，存储真实数据的迭代器
     bool first_scan_ = true;  // 首帧点云特殊处理
+    
+    // 回环检测使用
+    std::atomic<bool> has_new_grids_ = false;
+    std::list<KeyAndVoxel> lc_data_;   // 回环检测更新的数据
+    std::unordered_map<KeyType, std::list<KeyAndVoxel>::iterator, hash_vec<2>> lc_grids_;  // 回环检测往这个添加, 等空闲的时候再 std::move
+    bool lc_first_scan_ = true;
+
 };
 
 }

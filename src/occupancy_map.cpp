@@ -1,5 +1,5 @@
-#include "../include/occupancy_map.h"
-#include "../common/math_utils.h"
+#include "2dNdtLIO/include/occupancy_map.h"
+#include "2dNdtLIO/common/math_utils.h"
 
 #include <glog/logging.h>
 #include <execution>
@@ -8,6 +8,15 @@
 namespace sad {
 
 void OccupancyMap::addLidarFrame(std::shared_ptr<Frame> frame ){
+    if ( has_new_occu_map_.load() ) {  // 执行交换
+        std::scoped_lock lock(data_mutex_, lc_buffer_mutex_);
+        center_image_   = std::move(lc_center_image_);
+        occupancy_grid_ = std::move(lc_occupancy_grid_);
+        outFlags_       = OutsideFlags();
+        lc_outFlags_    = OutsideFlags();
+        has_new_occu_map_.store(false);
+    }
+
     auto & pts = frame->pts_;
 
     // 先计算末端点所在网格
@@ -134,6 +143,136 @@ void OccupancyMap::setPoint( const Vec2i & pt, bool occupy ){
     }
 }
 
+
+/**************************************** 回环中对缓冲区的操作 ********************************************/
+/**************************************** 回环中对缓冲区的操作 ********************************************/
+/**************************************** 回环中对缓冲区的操作 ********************************************/
+/**************************************** 回环中对缓冲区的操作 ********************************************/
+
+void OccupancyMap::addLidarFrameInBuffer( std::map<size_t, std::shared_ptr<Frame>> & frames, const int & frame_gap ){
+    std::unique_lock<std::mutex> lock(lc_buffer_mutex_);
+    lc_occupancy_grid_ = cv::Mat(occupancy_grid_.rows, occupancy_grid_.cols, CV_8U, 127);
+    lc_center_image_   = center_image_;
+
+    size_t num_frames = frames.size();
+    for ( size_t i = 0; i < num_frames; i += frame_gap ) {
+        std::shared_ptr<Frame> frame = frames[i];
+        auto & pts = frame->pts_;
+
+        // 先计算末端点所在网格
+        std::set<Vec2i, less_vec<2>> endpoints;
+
+        for ( size_t j = 0; j < pts.size(); ++j ) {
+            Vec2i img_point = world2ImageInBuffer(frame->pose_ * pts[j]);  /// 转换到图像坐标系
+            // 检查是否越界
+            if (img_point[0] < 0) lc_outFlags_.left_outside_ = true;
+            if (img_point[1] < 0) lc_outFlags_.top_outside_ = true;
+            if (img_point[0] >= lc_occupancy_grid_.cols) lc_outFlags_.right_outside_ = true;
+            if (img_point[1] >= lc_occupancy_grid_.rows) lc_outFlags_.bottom_outside_ = true;
+            endpoints.emplace(img_point);
+        }
+        
+        Vec2i start = world2ImageInBuffer(frame->pose_.translation());
+        /// 涂白
+        std::for_each(std::execution::par_unseq, endpoints.begin(), endpoints.end(),
+                    [this, &start](const auto & pt) { bresenhamFillingInBuffer(start, pt); });
+        /// 末端点涂黑
+        std::for_each(endpoints.begin(), endpoints.end(), [this](const auto & pt) { setPointInBuffer(pt, true); });
+
+        dynamicExpandInBuffer();  // 处理完之后再扩充, 不然会有很奇怪的bug
+    }
+    has_new_occu_map_.store(true);
+}
+
+void OccupancyMap::bresenhamFillingInBuffer( const Vec2i & p1, const Vec2i & p2 ){
+    int dx = p2.x() - p1.x();   int dy = p2.y() - p1.y();
+    int ux = dx > 0 ? 1 : -1;   int uy = dy > 0 ? 1 : -1; // 方向
+    dx = abs(dx);               dy = abs(dy);
+    int x = p1.x();             int y = p1.y();
+    
+    if ( dx > dy ) {
+        // 以x为增量
+        int e = -dx;
+        for (int i = 0; i < dx; ++i) {
+            x += ux;
+            e += 2 * dy;
+            if (e >= 0) {
+                y += uy;
+                e -= 2 * dx;
+            }
+            if (Vec2i(x, y) != p2) setPointInBuffer(Vec2i(x, y), false);
+        }
+    } else {
+        int e = -dy;
+        for (int i = 0; i < dy; ++i) {
+            y += uy;
+            e += 2 * dx;
+            if (e >= 0) {
+                x += ux;
+                e -= 2 * dy;
+            }
+            if (Vec2i(x, y) != p2)  setPointInBuffer(Vec2i(x, y), false);
+        }
+    }
+}
+
+void OccupancyMap::dynamicExpandInBuffer(){
+    bool need_expand = lc_outFlags_.left_outside_ || lc_outFlags_.top_outside_ || lc_outFlags_.right_outside_ || lc_outFlags_.bottom_outside_;
+    if (!need_expand) return;
+
+    int top_boarder = 0, bottom_boarder = 0, left_boarder = 0, right_boarder = 0;
+    if ( lc_outFlags_.left_outside_ ){
+        left_boarder = opts_.image_size_ / 5;
+        lc_center_image_.x() = lc_center_image_.x() + left_boarder;
+    }
+    
+    if ( lc_outFlags_.top_outside_ ){
+        top_boarder = opts_.image_size_ / 5;
+        lc_center_image_.y() = lc_center_image_.y() + top_boarder;
+    }
+    
+    if ( lc_outFlags_.right_outside_ ){
+        right_boarder = opts_.image_size_ / 5;
+    }
+    
+    if ( lc_outFlags_.bottom_outside_ ){
+        bottom_boarder = opts_.image_size_ / 5;
+    }
+
+    cv::Mat expanded_grid;
+    try {
+        cv::copyMakeBorder(lc_occupancy_grid_, expanded_grid, top_boarder, bottom_boarder, left_boarder, right_boarder,
+            cv::BORDER_CONSTANT, cv::Scalar(127));
+        
+        lc_occupancy_grid_ = expanded_grid;
+        std::cout << "Buffer Grid expanded to: " 
+                  << lc_occupancy_grid_.cols << "x" << lc_occupancy_grid_.rows 
+                  << " (added: L:" << left_boarder << " R:" << right_boarder
+                  << " T:" << top_boarder << " B:" << bottom_boarder << ")"
+                  << ", center: " << center_image_.transpose() << std::endl;
+        
+    } catch (const cv::Exception& e) { std::cerr << "Failed to expand grid: " << e.what() << std::endl; }
+    lc_outFlags_ = OutsideFlags();
+}
+
+void OccupancyMap::setPointInBuffer( const Vec2i & pt, bool occupy ){
+    int x = pt[0], y = pt[1];
+
+    /// 有无 occupied 都要检查，不然会报内存访问错误
+    if ( x < 0 ) lc_outFlags_.left_outside_ = true;
+    if ( y < 0 ) lc_outFlags_.top_outside_  = true;
+    if ( x >= lc_occupancy_grid_.cols ) lc_outFlags_.right_outside_ = true;
+    if ( y >= lc_occupancy_grid_.rows ) lc_outFlags_.bottom_outside_ = true;
+    if (lc_outFlags_.left_outside_ || lc_outFlags_.top_outside_ || lc_outFlags_.right_outside_ || lc_outFlags_.bottom_outside_ ) return;
+
+    /// 设置上下限
+    uchar value = lc_occupancy_grid_.at<uchar>(y,x);
+    if ( occupy ) {
+        if ( value > 117 ) lc_occupancy_grid_.ptr<uchar>(y)[x] -= 1;
+    } else {
+        if ( value < 137 ) lc_occupancy_grid_.ptr<uchar>(y)[x] += 1;
+    }
+}
 
 /************************************************* 显示地图 ***************************************/
 /************************************************* 显示地图 ***************************************/

@@ -1,8 +1,8 @@
 #ifndef __OCCUPANCY_MAP_H
 #define __OCCUPANCY_MAP_H
 
-#include "../include/frame.h"
-#include "../common/eigen_types.h"
+#include "2dNdtLIO/include/frame.h"
+#include "2dNdtLIO/common/eigen_types.h"
 
 #include <opencv2/core.hpp>
 
@@ -71,6 +71,14 @@ private:
         return Vec2i(x, y);
     }
     
+    /// 从世界坐标系转到图像坐标系
+    template <class T>
+    inline Vec2i world2ImageInBuffer(const Eigen::Matrix<T, 2, 1>& pt) {
+        Vec2d pt_map = pt * opts_.resolution_ + lc_center_image_;
+        int x = int(pt_map[0]);  // 扩展图像会出现偏移
+        int y = int(pt_map[1]);   // y轴方向换一下
+        return Vec2i(x, y);
+    }
 
     /**
      * Bresenham直线填充，给定起始点和终止点，将中间的区域填充为白色
@@ -81,9 +89,15 @@ private:
     void dynamicExpand();
     /// 在某个点填入占据或者非占据信息
     void setPoint( const Vec2i & pt, bool occupy );
+    
+    void bresenhamFillingInBuffer( const Vec2i & p1, const Vec2i & p2 );
+    void dynamicExpandInBuffer();
+    /// 在某个点填入占据或者非占据信息
+    void setPointInBuffer( const Vec2i & pt, bool occupy );
 
 private:
     std::mutex data_mutex_;
+    std::mutex lc_buffer_mutex_;
 
     Options opts_;
 
@@ -91,6 +105,13 @@ private:
     OutsideFlags outFlags_;
     cv::Mat occupancy_grid_;
     Vec2d center_image_;
+    
+    // 缓冲区 回环检测中使用
+    OutsideFlags lc_outFlags_;
+    cv::Mat lc_occupancy_grid_;
+    Vec2d lc_center_image_;
+    std::atomic<bool> has_new_occu_map_ = false;
+
 };
 
 }

@@ -1,9 +1,9 @@
 #ifndef __MAP_H
 #define __MAP_H
 
-#include "../include/frame.h"
-#include "../include/ndt_inc.h"
-#include "../include/occupancy_map.h"
+#include "2dNdtLIO/include/frame.h"
+#include "2dNdtLIO/include/ndt_inc.h"
+#include "2dNdtLIO/include/occupancy_map.h"
 #include <opencv2/opencv.hpp>
 #include <map>
 #include <thread>
