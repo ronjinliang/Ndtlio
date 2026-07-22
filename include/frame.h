@@ -2,9 +2,8 @@
 #define __FRAME_H
 
 #include <sensor_msgs/msg/laser_scan.hpp>
-#include <std_msgs/msg/header.hpp>
 
-#include "../common/eigen_types.h"
+#include "2dNdtLIO/common/eigen_types.h"
 
 #include <glog/logging.h>
 #include <fstream>

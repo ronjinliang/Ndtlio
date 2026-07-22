@@ -11,8 +11,8 @@
 #include <Eigen/Geometry>
 
 ///  sb 编译器总是找系统的头文件
-#include "../3rdparty/sophus/se2.hpp"
-#include "../3rdparty/sophus/se3.hpp"
+#include "/home/lrj/lidar_slam/3rdparty/src/sophus/sophus/se2.hpp"
+#include "/home/lrj/lidar_slam/3rdparty/src/sophus/sophus/se3.hpp"
 
 using Vec2i = Eigen::Vector2i;
 using Vec3i = Eigen::Vector3i;

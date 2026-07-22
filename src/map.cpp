@@ -1,4 +1,4 @@
-#include "../include/map.h"
+#include "2dNdtLIO/include/map.h"
 #include <yaml-cpp/yaml.h>
 
 namespace sad {
@@ -62,7 +62,6 @@ bool Map::matchScan(std::shared_ptr<Frame> frame){
     ndt_.alignNdt( frame->pose_ ); // 当前帧的 pose
     return true;
 }
-
 
 
 }

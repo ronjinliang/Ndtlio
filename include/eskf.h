@@ -1,13 +1,13 @@
 #ifndef __ESKF_H
 #define __ESKF_H
 
-#include "../common/eigen_types.h"
-#include "../common/imu.h"
-#include "../common/odom.h"
+#include "2dNdtLIO/common/eigen_types.h"
+#include "2dNdtLIO/common/imu.h"
+#include "2dNdtLIO/common/odom.h"
 
 namespace sad {
 /**
- * states: px, py, vx, vy, theta, bg, bax, bay  8d getNominal
+ * states: px, py, vx, vy, theta, bg, bax, bay  8d
  */
 class ESKF {
 public:
@@ -37,7 +37,6 @@ public:
 
     SE2 getNominalPose() const { return SE2( SO2(theta_), p_ ); }
     Vec8d getNominal();
-    double getDtheta() { return dtheta_; };
 
     void setInitCondition( const Options & opts, const double & init_bg, const Vec2d & init_ba );
     void setSE2( SE2 pose ) { p_ = pose.translation(); theta_ = pose.so2().log(); }
@@ -78,8 +77,7 @@ private:
 
     // 协方差矩阵
     Mat8d P_ = Mat8d::Identity();
-  
-    double dtheta_ = 0.0;
+
     double last_timestamp_ = 0.0;
     bool first_lidar_ = true;
 
