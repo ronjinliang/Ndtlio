@@ -94,6 +94,7 @@ public:
     Vec3d GetInitBg() const { return init_bg_; }
     Vec3d GetInitBa() const { return init_ba_; }
     Vec3d GetGravity() const { return gravity_; }
+    Vec3d GetMeanAcce() const { return mean_acce_; }
 
 private:
     // 尝试对系统初始化
@@ -106,6 +107,8 @@ private:
         Vec3d mean_gyro, mean_acce;
         math::ComputeMeanAndCovDiag(init_imu_deque_, mean_gyro, cov_gyro_, [](const IMU& imu) { return imu.gyro_; });
         math::ComputeMeanAndCovDiag(init_imu_deque_, mean_acce, cov_acce_, [this](const IMU& imu) { return imu.acce_; });
+
+        mean_acce_ = mean_acce;
 
         // 以acce均值为方向，取9.8长度为重力
         LOG(INFO) << "mean acce: " << mean_acce.transpose();
@@ -147,6 +150,7 @@ private:
     Vec3d init_bg_ = Vec3d::Zero();     // 陀螺仪初始零偏
     Vec3d init_ba_ = Vec3d::Zero();     // 加速度计初始零偏
     Vec3d gravity_ = Vec3d::Zero();     // 重力
+    Vec3d mean_acce_ = Vec3d::Zero();
 
     bool is_static_ = true;             // 判断车是否静止
     std::deque<IMU> init_imu_deque_;    // 初始化用的数据
