@@ -83,6 +83,15 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
             Vec2d q = source_->pts_[idx];
             Vec2d qs = pose * q;  // 转换到当前估计的位姿
 
+            // 构建雅可比矩阵
+            // J = [de/dtheta, de/dx, de/dy]
+            // de/dtheta = R * [q_y, -q_x]^T
+            // de/dx = [1, 0]^T, de/dy = [0, 1]^T
+            // build residual
+            Eigen::Matrix<double, 2, 3> J;
+            J.block<2, 1>(0,0) = pose.so2().matrix() * Vec2d( -q(1), q(0) );
+            J.block<2, 2>(0,1) = Mat2d::Identity();
+
             // 计算体素索引（使用体素分辨率）
             Vec2i key = (qs*opts_.inv_voxel_size_).array().round().cast<int>();
 
@@ -101,15 +110,6 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
                         effect_pts[real_idx] = false;
                         continue;
                     }
-
-                    // 构建雅可比矩阵
-                    // J = [de/dtheta, de/dx, de/dy]
-                    // de/dtheta = R * [q_y, -q_x]^T
-                    // de/dx = [1, 0]^T, de/dy = [0, 1]^T
-                    // build residual
-                    Eigen::Matrix<double, 2, 3> J;
-                    J.block<2, 1>(0,0) = pose.so2().matrix() * Vec2d( -q(1), q(0) );
-                    J.block<2, 2>(0,1) = Mat2d::Identity();
 
                     jacobians[real_idx] = J;
                     errors[real_idx] = e;
@@ -147,6 +147,8 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
 
         // 求解增量：H * dx = -err
         Vec3d dx = H.inverse() * err;
+        // Vec3d dx = H.ldlt().solve(err);
+        // Vec3d dx = H.colPivHouseholderQr().solve(err);
         pose.so2() = pose.so2() * SO2::exp(dx(0));
         pose.translation() += dx.tail<2>();
 
@@ -284,13 +286,13 @@ void NdtInc2d::updateVoxel(Voxel & v, bool & first_scan_flag){
         v.pts_.clear();
 
         // 计算新的信息矩阵（稳健的逆）
-        Eigen::JacobiSVD svd(v.sig_, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        Eigen::JacobiSVD<Mat2d> svd(v.sig_, Eigen::ComputeFullU | Eigen::ComputeFullV);
         Vec2d lambda = svd.singularValues();
-        if (lambda[1] < lambda[0] * 1e-3) {
-            lambda[1] = lambda[0] * 1e-3;
+        double max_lambda = lambda[0];
+        if (lambda[1] < max_lambda * 1e-4) {
+            lambda[1] = max_lambda * 1e-4;
         }
-        Mat2d inv_lambda = Vec2d(1.0 / lambda[0], 1.0 / lambda[1]).asDiagonal();
-        v.info_ = svd.matrixV() * inv_lambda * svd.matrixU().transpose();
+        v.info_ = svd.matrixV() * lambda.cwiseInverse().asDiagonal() * svd.matrixU().transpose();
     }
 }
 
