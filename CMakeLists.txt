@@ -55,7 +55,18 @@ target_link_libraries(test_ros2_lio
     ndt_lio_node
 )
 
-install(TARGETS ndt_lio_node test_ros2_lio
+# 获取IMU信息的节点
+add_executable(process_imu process_imu.cpp)
+target_link_libraries(process_imu
+  glog
+  ${YAML_CPP_LIBRARIES}
+)
+ament_target_dependencies( process_imu
+  rclcpp
+  sensor_msgs
+)
+
+install(TARGETS ndt_lio_node test_ros2_lio process_imu
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
