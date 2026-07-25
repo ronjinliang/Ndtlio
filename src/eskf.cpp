@@ -100,7 +100,7 @@ bool ESKF::predict( const IMUPtr imu ){
     // 不能直接对acce使用SO2::hat，自己推了一下，是这样子的
     F.block<2,1>(2,4) =   R_mat * Vec2d( -a.y(), a.x() ) * dt;
     F.block<2,2>(2,6) = - R_mat * dt;
-    F.block<1,1>(4,4) = - Mat1d( dg );
+    // F.block<1,1>(4,4) = - Mat1d( dg );
     F.block<1,1>(4,5) = - Mat1d::Identity() * dt;
 
     // 3. 误差协方差矩阵
@@ -142,7 +142,6 @@ bool ESKF::observeLidar( const SE2 pose ){
     innovation.head<2>() = pose.translation() - p_;
     innovation.tail<1>() = Mat1d(( SO2(theta_).inverse() * pose.so2() ).log());
 
-    
     // # 2. 计算测量雅可比H
     // H_lidar_
 
@@ -173,26 +172,6 @@ void ESKF::updateAndReset(){
         ba_ += dx_.block<2,1>(6,0);
     }
 
-    // 对P阵进行投影，参考式(3.63)
-    /*
-    1  0  0  0  0  0  0  0
-    0  1  0  0  0  0  0  0
-    0  0  1  0  0  0  0  0
-    0  0  0  1  0  0  0  0
-    0  0  0  0  x  0  0  0
-    0  0  0  0  0  1  0  0
-    0  0  0  0  0  0  1  0
-    0  0  0  0  0  0  0  1
-    */
-
-    // Mat8d J = Mat8d::Identity();
-    // J(4,4) = 1 - 0.5*dx_(4,0);
-    // P_ = J * P_ * J.transpose();
-
-    double J = 1 - 0.5*dx_(4);
-    double J2 = J*J;
-    P_.block<1,8>(4,0) = J2 * P_.block<1,8>(4,0);
-    P_.block<8,1>(0,4) = J2 * P_.block<8,1>(0,4);
     dx_.setZero();
 }
 
