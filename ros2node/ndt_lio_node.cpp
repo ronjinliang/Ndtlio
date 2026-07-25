@@ -147,11 +147,11 @@ void NDTLIONode::imuCallback( const sensor_msgs::msg::Imu::SharedPtr msg ){
     
     if ( imu_init_success_ ) {
         ndt_lio_.processIMU(imu);
-        auto current_frame = ndt_lio_.getFrontend()->getCurrentFrame();
-        if ( current_frame ) {  // 更新 base to odom
-            SE2 baseToMap = current_frame->pose_;
-            publichBaseToMap( baseToMap );
-        }
+        // auto current_frame = ndt_lio_.getFrontend()->getCurrentFrame();
+        // if ( current_frame ) {  // 更新 base to odom
+        //     SE2 baseToMap = current_frame->pose_;
+        //     publichBaseToMap( baseToMap );
+        // }
     } else {
         imu_init_success_ = ndt_lio_.initIMU(imu);  // 先初始化 imu
     }
@@ -177,20 +177,21 @@ void NDTLIONode::scanCallback( const sensor_msgs::msg::LaserScan::SharedPtr msg 
             laser_scan_pcl.is_bigendian = false;
             // 定义字段：2D点云只需要x,y，但可以添加强度等
             sensor_msgs::PointCloud2Modifier modifier(laser_scan_pcl);
-            modifier.setPointCloud2Fields(3, // 字段数量
+            modifier.setPointCloud2Fields(2, // 字段数量
                 "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-                "y", 1, sensor_msgs::msg::PointField::FLOAT32,
-                "z", 1, sensor_msgs::msg::PointField::FLOAT32);
+                "y", 1, sensor_msgs::msg::PointField::FLOAT32);
             // 填充数据
             sensor_msgs::PointCloud2Iterator<float> iter_x(laser_scan_pcl, "x");
             sensor_msgs::PointCloud2Iterator<float> iter_y(laser_scan_pcl, "y");
-            sensor_msgs::PointCloud2Iterator<float> iter_z(laser_scan_pcl, "z");
             for ( auto & pt : frame->pts_ ) {
-                *iter_x = pt(0);    *iter_y = pt(1);    *iter_z = 0.0f;
-                ++iter_x;          ++iter_y;          ++iter_z;
+                *iter_x = pt(0);    *iter_y = pt(1);
+                ++iter_x;           ++iter_y;
             }
             scan_plc_pub_->publish(laser_scan_pcl);
         }
+
+        SE2 baseToMap = frame->pose_;
+        publichBaseToMap( baseToMap );
 
         if ( frontend->isKeyframe() ) {  // 是关键帧就更新并发布轨迹
             SE2 baseToMap = frontend->getCurrentFrame()->pose_;

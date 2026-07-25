@@ -1,6 +1,6 @@
 main:
   laser_topic: /scan
-  imu_topic: /imu
+  imu_topic: /mpu6050/imu
   odom_topic: /robotvel   # ieskf 加了轮速计之后就不怎么发散了
   
   localization_mode: false   # 定位模式(只更新base->odom, odom->map需要做重定位，重定位太麻烦了，在rviz中用2d pose estimate粗略弄一下得了)
@@ -10,9 +10,9 @@ frontend:
   kf_distance: 0.2   # default = 0.25
   kf_angle_deg: 30.0  # default = 30.0
   kf_add_scan_in_occu: 1 # 10个关键 scan 放入一次 occupancy map
-  max_distance: 10.0     # 最远 10m (不包括 occupancy map)
+  max_distance: 5.0     # 最远 10m (不包括 occupancy map)
   angle_boarder: 0.0
-  imu_states_buffer_size: 10   # 去畸变的imu数据缓存
+  imu_states_buffer_size: 20   # 去畸变的imu数据缓存
 ndt:
   max_iter: 50           # 最大迭代次数
   voxel_size: 0.65        # 体素大小   单位 m / voxel   default = 0.2   太小的话可能在旋转的时候产生偏移
@@ -23,7 +23,7 @@ ndt:
   res_outlier_th: 5.661  # 卡方检验阈值（95%置信度）  基于马氏距离的卡方检验阈值。   default = 5.661
   capacity: 10000         # 缓存的体素数量   default = 100000
   normalizing_factor: 1e-3  # 正则化因子
-  init_info: 1e3         # 初始化 voxel 信息矩阵
+  init_info: 1e6         # 初始化 voxel 信息矩阵
   nearby_type: 2         # 0:center | 1:4 | 2:8 (default)
 occupancy_map:
   closest_th: 0.1         # MODEL_POINTS 近距离阈值            default = 0.1
@@ -33,11 +33,11 @@ occupancy_map:
 
 imu:
   imu_dt: 0.01   # 0.01s 即 100Hz   检查时间戳用的
-  bax: -0.0506324
-  bay: 0.453892
-  bg: -0.0270514
+  bax: 0.0380618
+  bay: -0.0107006
+  bg: 0.000122951
   # 噪声设为负数，系统自动计算
-  gyro_var: 2e-1
+  gyro_var: 2e-2
   acce_var: 2e-2
   bias_gyro_var: -1
   bias_acce_var: -1
