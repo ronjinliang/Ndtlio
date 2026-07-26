@@ -66,7 +66,7 @@ bool IESKF::predict( const IMUPtr imu ){
     Vec2d imu_acce(imu->acce_.x(), imu->acce_.y());
     Vec2d a = imu_acce - ba_;
     if ( imu->acce_.z() < 2.0 ) {  // 针对归一化之后的数据
-        a *= kGravity;
+        a *= 9.82;
     }
     double dg = ( imu->gyro_.z() - bg_ ) * dt;
 
