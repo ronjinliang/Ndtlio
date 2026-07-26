@@ -99,13 +99,11 @@ void NDTLIONode::signCallback( const std_msgs::msg::Int32::SharedPtr msg ){
     int sign = msg->data;
     if (sign == -2){
         std::lock_guard<std::mutex> lock(mtx_);
-        // timer_static_tf_->cancel();
-        // timer_tf_->cancel();
         ndt_lio_ = sad::IncrementalNDTLO(config_file_, with_imu_);
-        // timer_static_tf_->reset();
-        // timer_tf_->reset();
+        imu_init_success_ = false;
         has_initial_pose_ = false;
-        LOG(INFO) << "stop publish tf";
+        trajectory_.poses.clear();
+        LOG(INFO) << "reset lio";
     }
 }
 
@@ -147,11 +145,11 @@ void NDTLIONode::imuCallback( const sensor_msgs::msg::Imu::SharedPtr msg ){
     
     if ( imu_init_success_ ) {
         ndt_lio_.processIMU(imu);
-        // auto current_frame = ndt_lio_.getFrontend()->getCurrentFrame();
-        // if ( current_frame ) {  // 更新 base to odom
-        //     SE2 baseToMap = current_frame->pose_;
-        //     publichBaseToMap( baseToMap );
-        // }
+        auto current_frame = ndt_lio_.getFrontend()->getCurrentFrame();
+        if ( current_frame ) {  // 更新 base to odom
+            SE2 baseToMap = current_frame->pose_;
+            publichBaseToMap( baseToMap );
+        }
     } else {
         imu_init_success_ = ndt_lio_.initIMU(imu);  // 先初始化 imu
     }
@@ -190,8 +188,8 @@ void NDTLIONode::scanCallback( const sensor_msgs::msg::LaserScan::SharedPtr msg 
             scan_plc_pub_->publish(laser_scan_pcl);
         }
 
-        SE2 baseToMap = frame->pose_;
-        publichBaseToMap( baseToMap );
+        // SE2 baseToMap = frame->pose_;
+        // publichBaseToMap( baseToMap );
 
         if ( frontend->isKeyframe() ) {  // 是关键帧就更新并发布轨迹
             SE2 baseToMap = frontend->getCurrentFrame()->pose_;

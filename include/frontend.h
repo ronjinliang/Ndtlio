@@ -46,9 +46,9 @@ public:
 
 private:
     // 去畸变同时也转成点云
-    void undistortAndGeneratePoints( Scan2d::Ptr scan );
+    void undistortAndGeneratePoints( Scan2d::Ptr scan);
     inline bool poseInterp(double query_time, double last_time, SE2 & result, float time_th = 0.5 );
-
+    void convertPoints( SE2 T_wi );
     bool isKeyFrame();
     /// 增加一个关键帧
     void addKeyFrame(Scan2d::Ptr scan);

@@ -26,19 +26,23 @@ bool Frontend::processScan( Scan2d::Ptr scan ){
         LOG(INFO) << "range max: " << range_max_              << ", range min: " << range_min_
                 << ", angle max: " << angle_max_ * 180.0/M_PI << ", angle min: " << angle_min_ * 180.0/M_PI;
     } else {
-        
+        // 因为假设IMU与雷达位置重叠，所以 T_wi 等价于 T_wl
         if ( eskf_ ) {  // eskf
             // ESKF 先验(初值)
-            current_frame_->pose_ = eskf_->getNominalPose();
+            SE2 T_wi = eskf_->getNominalPose();
+            current_frame_->pose_ = T_wi;
             map_->matchScan(current_frame_);  // 先匹配后融合   雷达坐标系
             eskf_->observeLidar(current_frame_->pose_);
             current_frame_->pose_ = eskf_->getNominalPose();
+            convertPoints( T_wi );
         } else if ( ieskf_ ) {   // ieskf
+            SE2 T_wi = eskf_->getNominalPose();
             map_->getNdt().setSource(current_frame_);  // ieskf 要单独设置一下
             ieskf_->updateUsingCustomObserve( [this]( const SE2 & init_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r ){
                 map_->getNdt().computeResidualAndJacobians(init_pose, HT_Vinv_H, HT_Vinv_r );  // 先计算矩阵和误差, 后融合
             });
             current_frame_->pose_ = ieskf_->getNominalPose();
+            convertPoints( T_wi );
         } else {  // NDT LO
             // set pose from last frame
             current_frame_->pose_ = last_frame_pose_ * motion_guess_;   // T_wl1 * T_l1l2
@@ -179,6 +183,17 @@ inline bool Frontend::poseInterp(double query_time, double last_time, SE2 & resu
     SE2 delta = SE2::exp(log_rel);
     result = T_a * delta;
     return true;
+}
+
+void Frontend::convertPoints( SE2 T_wi ){
+    // 去畸变并且匹配完成之后，将点云再做一次修正
+    SE2 deltaT = current_frame_->pose_.inverse() * T_wi; // T_wi_new.inverse() * T_wi_old
+
+    #pragma omp parallel for
+    for (size_t i = 0; i < current_frame_->pts_.size(); ++i ) {
+        current_frame_->pts_[i] = deltaT * current_frame_->pts_[i];
+    }
+    // LOG(INFO) << deltaT.translation().transpose() << ", " << deltaT.so2().log() * 180. / M_PI;
 }
 
 /// 判定当前帧是否为关键帧
