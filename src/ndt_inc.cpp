@@ -68,14 +68,15 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
     int total_nearby = nearby_grids_.size();
     int total_size = index.size() * total_nearby;
 
+    std::vector<bool> effect_pts(total_size, false);
+    // 2x3
+    // dex / dtheta  |  dex / dx  |  dex / dy
+    // dey / dtheta  |  dey / dx  |  dey / dy
+    std::vector<Eigen::Matrix<double, 2, 3>> jacobians(total_size);
+    std::vector<Vec2d> errors(total_size);
+    std::vector<Mat2d> infos(total_size);
+    
     for (int iter = 0; iter < opts_.max_iter_; ++iter) {
-        std::vector<bool> effect_pts(total_size, false);
-        // 2x3
-        // dex / dtheta  |  dex / dx  |  dex / dy
-        // dey / dtheta  |  dey / dx  |  dey / dy
-        std::vector<Eigen::Matrix<double, 2, 3>> jacobians(total_size);
-        std::vector<Vec2d> errors(total_size);
-        std::vector<Mat2d> infos(total_size);
         
         // gauss-newtown 迭代
         // 最近邻
@@ -161,7 +162,7 @@ bool NdtInc2d::alignNdt( SE2 & init_pose ){
     return true;
 }
 
-void NdtInc2d::conputeResidualAndJacobians( const SE2 & input_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r ){
+void NdtInc2d::computeResidualAndJacobians( const SE2 & input_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r ){
     if (grids_.empty() || source_ == nullptr) {
         LOG(WARNING) << "No grids available for alignment! or source_ is nullptr!";
         return;
@@ -178,7 +179,7 @@ void NdtInc2d::conputeResidualAndJacobians( const SE2 & input_pose, Mat8d & HT_V
     int total_size = index.size() * total_nearby;
 
     std::vector<bool> effect_pts(total_size, false);
-    std::vector<Eigen::Matrix<double, 2, 8>> jacobians(total_size);
+    std::vector<Eigen::Matrix<double, 2, 8>, Eigen::aligned_allocator<Eigen::Matrix<double, 2, 8>>> jacobians(total_size);
     std::vector<Vec2d> errors(total_size);
     std::vector<Mat2d> infos(total_size);
     
@@ -264,6 +265,7 @@ void NdtInc2d::updateVoxel(Voxel & v, bool & first_scan_flag){
     // 非第一帧的处理
     if (v.ndt_estimated_ && v.num_pts_ > opts_.max_pts_in_voxel_) {
         // 点数太多，不再更新（保持稳定）
+        v.pts_.clear();  // 释放不再需要的点云内存
         return;
     }
 

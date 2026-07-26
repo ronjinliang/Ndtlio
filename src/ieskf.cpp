@@ -12,6 +12,8 @@ IESKF::IESKF(Options opts) : opts_(opts) {
     P_(5,5) = 0.01; // 陀螺仪bias
     P_(6,6) = 0.01; // 加速度计bias
     P_(7,7) = 0.01;
+
+    dx_ = Vec8d::Zero();  // 误差状态初始化为零向量
     
     //   px  py  vx  vy  R   bg  bax bay
     //   0   1   2   3   4   5   6   7  
@@ -64,7 +66,7 @@ bool IESKF::predict( const IMUPtr imu ){
     Vec2d imu_acce(imu->acce_.x(), imu->acce_.y());
     Vec2d a = imu_acce - ba_;
     if ( imu->acce_.z() < 2.0 ) {  // 针对归一化之后的数据
-        a *= 9.82;
+        a *= kGravity;
     }
     double dg = ( imu->gyro_.z() - bg_ ) * dt;
 
@@ -87,7 +89,7 @@ bool IESKF::predict( const IMUPtr imu ){
     // 不能直接对acce使用SO2::hat，自己推了一下，是这样子的
     F.block<2,1>(2,4) =   R_mat * Vec2d( -a.y(), a.x() ) * dt;
     F.block<2,2>(2,6) = - R_mat * dt;
-    F.block<1,1>(4,4) = - Mat1d( dg );
+    // F(4,4) = 1 (identity), already set by Mat8d::Identity()
     F.block<1,1>(4,5) = - Mat1d::Identity() * dt;
 
     // 3. 误差协方差矩阵
@@ -159,7 +161,7 @@ bool IESKF::updateUsingCustomObserve( CustomObsFunc obs){
 
         Qk = ( Pk.inverse() + HT_Vinv_H ).inverse();  // 这个记作中间变量，最后更新时可以用   直接这样会出现 nan
         dx_ = Qk * HT_Vinv_r;
-        if ( std::isnan(dx_(4)) ) continue;
+        if ( dx_.hasNaN() ) continue;
         // LOG(INFO) << "iter " << iter << " dx = " << dx_.transpose() << ", dxn: " << dx_.norm();
 
         // 合入名义变量

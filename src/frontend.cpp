@@ -36,7 +36,7 @@ bool Frontend::processScan( Scan2d::Ptr scan ){
         } else if ( ieskf_ ) {   // ieskf
             map_->getNdt().setSource(current_frame_);  // ieskf 要单独设置一下
             ieskf_->updateUsingCustomObserve( [this]( const SE2 & init_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r ){
-                map_->getNdt().conputeResidualAndJacobians(init_pose, HT_Vinv_H, HT_Vinv_r );  // 先计算矩阵和误差, 后融合
+                map_->getNdt().computeResidualAndJacobians(init_pose, HT_Vinv_H, HT_Vinv_r );  // 先计算矩阵和误差, 后融合
             });
             current_frame_->pose_ = ieskf_->getNominalPose();
         } else {  // NDT LO
@@ -65,7 +65,7 @@ bool Frontend::processIMU( const IMUPtr imu ){
     } else if ( ieskf_ ) {
         res = ieskf_->predict(imu);
         imu_states_.push_back({imu->timestamp_, ieskf_->getNominalPose()} );
-    }
+        }
     if ( imu_states_.size() == opts_.imu_states_buffer_size_ ) imu_states_.pop_front();  // 维持10个imu数据
     return res;
 }
@@ -76,6 +76,7 @@ bool Frontend::processOdom( const std::shared_ptr<Odom> odom ){
     } else if ( ieskf_ ) {
         return ieskf_->observeOdom(odom);
     }
+    return false;
 }
 
 void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){

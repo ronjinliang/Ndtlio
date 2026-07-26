@@ -1,5 +1,5 @@
-#ifndef __FRONTEBD_H
-#define __FRONTEBD_H
+#ifndef __FRONTEND_H
+#define __FRONTEND_H
 
 #include <thread>
 #include <memory>

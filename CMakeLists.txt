@@ -3,8 +3,8 @@ project(NdtLIO)
 
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "-w")
-set(CMAKE_CXX_FLAGS_RELEASE "-O1 -ffunction-sections -fdata-sections")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -ffunction-sections -fdata-sections")
 set(CMAKE_CXX_FLAGS_DEBUG "-g ${CMAKE_CXX_FLAGS}")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)

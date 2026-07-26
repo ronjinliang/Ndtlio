@@ -69,8 +69,6 @@ bool ESKF::predict( const IMUPtr imu ){
         last_timestamp_ = imu->timestamp_;
         return false;
     }
-    
-    dt = options_.imu_dt_;
 
     Vec2d a = Vec2d(imu->acce_.x(), imu->acce_.y()) - ba_;
     if ( imu->acce_.z() < 2.0 ) {  // 针对归一化之后的数据
@@ -101,7 +99,6 @@ bool ESKF::predict( const IMUPtr imu ){
     // 不能直接对acce使用SO2::hat，自己推了一下，是这样子的
     F.block<2,1>(2,4) =   R_mat * Vec2d( -a.y(), a.x() ) * dt;
     F.block<2,2>(2,6) = - R_mat * dt;
-    F.block<1,1>(4,4) = - Mat1d( dg );
     F.block<1,1>(4,5) = - Mat1d::Identity() * dt;
 
     // 3. 误差协方差矩阵

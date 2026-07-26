@@ -87,7 +87,7 @@ private:
     Vec2d ba_ = Vec2d::Zero();
 
     // 误差状态变量
-    Vec8d dx_ = Vec8d::Identity();
+    Vec8d dx_ = Vec8d::Zero();
 
     // 过程噪声
     Mat8d Q_ = Mat8d::Identity();

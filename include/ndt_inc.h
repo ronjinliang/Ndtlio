@@ -89,7 +89,7 @@ public:
      * @param HTVH
      * @param HTVr
      */
-    void conputeResidualAndJacobians( const SE2 & input_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r );
+    void computeResidualAndJacobians( const SE2 & input_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r );
 
 private:
     //// 更新 voxel 内部数据，根据新加入的 pts 和历史估计情况来确定自己的估计
