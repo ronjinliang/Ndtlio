@@ -1,6 +1,6 @@
 main:
   laser_topic: /scan
-  imu_topic: /mpu6050/imu
+  imu_topic: /mpu9250/imu
   odom_topic: /robotvel   # ieskf 加了轮速计之后就不怎么发散了
   
   localization_mode: false   # 定位模式(只更新base->odom, odom->map需要做重定位，重定位太麻烦了，在rviz中用2d pose estimate粗略弄一下得了)
@@ -20,7 +20,7 @@ ndt:
   min_pts_in_voxel: 10   # 每个栅格中最小点数  default = 10
   max_pts_in_voxel: 50   # 每个栅格中最大点数  default = 50
   eps: 1e-3              # 停止优化的条件 通常取体素大小的1% 默认-1在程序中计算 default = 1e-3
-  res_outlier_th: 5.661  # 卡方检验阈值（95%置信度）  基于马氏距离的卡方检验阈值。   default = 5.661
+  res_outlier_th: 10.0  # 卡方检验阈值（95%置信度）  基于马氏距离的卡方检验阈值。   default = 5.661
   capacity: 10000         # 缓存的体素数量   default = 100000
   normalizing_factor: 1e-3  # 正则化因子
   init_info: 1e6         # 初始化 voxel 信息矩阵
@@ -37,7 +37,7 @@ imu:
   bay: -0.0107006
   bg: 0.000122951
   # 噪声设为负数，系统自动计算
-  gyro_var: 2e-2
+  gyro_var: 2e-1
   acce_var: 2e-2
   bias_gyro_var: -1
   bias_acce_var: -1

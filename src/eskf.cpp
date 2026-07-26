@@ -69,6 +69,8 @@ bool ESKF::predict( const IMUPtr imu ){
         last_timestamp_ = imu->timestamp_;
         return false;
     }
+    
+    dt = options_.imu_dt_;
 
     Vec2d a = Vec2d(imu->acce_.x(), imu->acce_.y()) - ba_;
     if ( imu->acce_.z() < 2.0 ) {  // 针对归一化之后的数据

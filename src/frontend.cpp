@@ -104,7 +104,8 @@ void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
         // if ( !first_scan_ && ( angle > 5./6.*M_PI && angle < 7./6.*M_PI) ) continue;   // 自己数据集去掉背后的数据  TUDO
 
         double range = scan->ranges[idx];
-        if ( !first_scan_ && (range < range_min_ || range > range_max_) ) continue;
+        // if ( !first_scan_ && (range < range_min_ || range > range_max_) ) continue;
+        if ( !first_scan_ && range > range_max_ ) continue;
         double query_time = lidar_begin_time + idx * scan->time_increment;
         Vec2d raw_point( range * cos(angle), range * sin(angle) );
         if ( imu_empty ) {
