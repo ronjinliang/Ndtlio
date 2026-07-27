@@ -55,9 +55,11 @@ IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu )
     if ( with_imu == 1 ) {
         eskf_ = std::make_shared<ESKF>(ESKF::Options());
         frontend_->setESKF(eskf_);
+        LOG(INFO) << "using eskf.";
     } else if ( with_imu == 2 ) {
         ieskf_ = std::make_shared<IESKF>(IESKF::Options());
         frontend_->setIESKF(ieskf_);
+        LOG(INFO) << "using ieskf.";
     }
 
     imu_dt_                 = config["imu"]["imu_dt"].as<double>();

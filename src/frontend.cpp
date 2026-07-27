@@ -85,23 +85,21 @@ bool Frontend::processOdom( const std::shared_ptr<Odom> odom ){
 
 void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
     SE2 T_end = SE2();
-    double scan_end_time = double(scan->header.stamp.sec) + double(scan->header.stamp.nanosec)*1e-9;
+    double lidar_begin_time = double(scan->header.stamp.sec) + double(scan->header.stamp.nanosec)*1e-9;
     if ( eskf_ ) {
         T_end = eskf_->getNominalPose();
-        // poseInterp(scan_end_time, imu_states_.rbegin()->first, T_end);
     } else if ( ieskf_ ) {
         T_end = ieskf_->getNominalPose();
-        // poseInterp(scan_end_time, imu_states_.rbegin()->first, T_end);
     }
     
     bool imu_empty = imu_states_.empty();
     
     const float time_th = 0.5;
     int scan_num = scan->ranges.size();
-    double lidar_begin_time = 0.0;
+    double lidar_end_time = 0.0;
     double last_time = 0.0;
     if ( !imu_empty ) {  // 直接 LO
-        lidar_begin_time = scan_end_time - scan->time_increment * scan_num;
+        lidar_end_time = lidar_begin_time + scan->time_increment * scan_num;
         last_time = imu_states_.rbegin()->first;
     }
 
