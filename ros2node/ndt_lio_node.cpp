@@ -164,6 +164,10 @@ void NDTLIONode::scanCallback( const sensor_msgs::msg::LaserScan::SharedPtr msg 
         ndt_lio_.processScan(msg);
         auto frontend = ndt_lio_.getFrontend();
         auto frame = frontend->getCurrentFrame();
+
+        SE2 baseToMap = frame->pose_;
+        publichBaseToMap( baseToMap );
+
         sensor_msgs::msg::PointCloud2 laser_scan_pcl;
         laser_scan_pcl.header.frame_id = msg->header.frame_id;  // 设置头部
         laser_scan_pcl.header.stamp = msg->header.stamp;
@@ -175,21 +179,20 @@ void NDTLIONode::scanCallback( const sensor_msgs::msg::LaserScan::SharedPtr msg 
             laser_scan_pcl.is_bigendian = false;
             // 定义字段：2D点云只需要x,y，但可以添加强度等
             sensor_msgs::PointCloud2Modifier modifier(laser_scan_pcl);
-            modifier.setPointCloud2Fields(2, // 字段数量
+            modifier.setPointCloud2Fields(3, // 字段数量
                 "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-                "y", 1, sensor_msgs::msg::PointField::FLOAT32);
+                "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+                "z", 1, sensor_msgs::msg::PointField::FLOAT32);
             // 填充数据
             sensor_msgs::PointCloud2Iterator<float> iter_x(laser_scan_pcl, "x");
             sensor_msgs::PointCloud2Iterator<float> iter_y(laser_scan_pcl, "y");
+            sensor_msgs::PointCloud2Iterator<float> iter_z(laser_scan_pcl, "z");
             for ( auto & pt : frame->pts_ ) {
-                *iter_x = pt(0);    *iter_y = pt(1);
-                ++iter_x;           ++iter_y;
+                *iter_x = pt(0);    *iter_y = pt(1);    *iter_z = 0.0;
+                ++iter_x;           ++iter_y;           ++iter_z;
             }
             scan_plc_pub_->publish(laser_scan_pcl);
         }
-
-        // SE2 baseToMap = frame->pose_;
-        // publichBaseToMap( baseToMap );
 
         if ( frontend->isKeyframe() ) {  // 是关键帧就更新并发布轨迹
             SE2 baseToMap = frontend->getCurrentFrame()->pose_;

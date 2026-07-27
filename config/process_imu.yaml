@@ -1,1 +1,1 @@
-imu_topic: /imu
+imu_topic: /mpu9250/imu

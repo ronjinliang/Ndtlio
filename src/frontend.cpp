@@ -36,7 +36,7 @@ bool Frontend::processScan( Scan2d::Ptr scan ){
             current_frame_->pose_ = eskf_->getNominalPose();
             convertPoints( T_wi );
         } else if ( ieskf_ ) {   // ieskf
-            SE2 T_wi = eskf_->getNominalPose();
+            SE2 T_wi = ieskf_->getNominalPose();
             map_->getNdt().setSource(current_frame_);  // ieskf 要单独设置一下
             ieskf_->updateUsingCustomObserve( [this]( const SE2 & init_pose, Mat8d & HT_Vinv_H, Vec8d & HT_Vinv_r ){
                 map_->getNdt().computeResidualAndJacobians(init_pose, HT_Vinv_H, HT_Vinv_r );  // 先计算矩阵和误差, 后融合
@@ -85,11 +85,15 @@ bool Frontend::processOdom( const std::shared_ptr<Odom> odom ){
 
 void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
     SE2 T_end = SE2();
+    double scan_end_time = double(scan->header.stamp.sec) + double(scan->header.stamp.nanosec)*1e-9;
     if ( eskf_ ) {
         T_end = eskf_->getNominalPose();
+        // poseInterp(scan_end_time, imu_states_.rbegin()->first, T_end);
     } else if ( ieskf_ ) {
         T_end = ieskf_->getNominalPose();
+        // poseInterp(scan_end_time, imu_states_.rbegin()->first, T_end);
     }
+    
     bool imu_empty = imu_states_.empty();
     
     const float time_th = 0.5;
@@ -97,7 +101,7 @@ void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
     double lidar_begin_time = 0.0;
     double last_time = 0.0;
     if ( !imu_empty ) {  // 直接 LO
-        lidar_begin_time = double(scan->header.stamp.sec) + double(scan->header.stamp.nanosec)*1e-9 - scan->time_increment * scan_num;
+        lidar_begin_time = scan_end_time - scan->time_increment * scan_num;
         last_time = imu_states_.rbegin()->first;
     }
 
@@ -121,9 +125,10 @@ void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
                 LOG(INFO) << "interp false";
                 Ti = T_end;
             }
-            SE2 deltaT = Ti.inverse() * T_end;
-            // T_end:T_w_i
-            // Ti_t: T_w_i_t  t时刻 变换到 t 时刻
+            // SE2 deltaT = Ti.inverse() * T_end;
+            SE2 deltaT = T_end.inverse() * Ti;
+            // T_end:T_w_i_t
+            // Ti_t: T_w_i_i  i 时刻变换到 t 时刻
             Vec2d p_compensate = deltaT * raw_point;
             current_frame_->pts_.emplace_back(p_compensate);
         }
@@ -185,14 +190,16 @@ inline bool Frontend::poseInterp(double query_time, double last_time, SE2 & resu
     return true;
 }
 
-void Frontend::convertPoints( SE2 T_wi ){
+void Frontend::convertPoints( const SE2 & T_wi ){
     // 去畸变并且匹配完成之后，将点云再做一次修正
     SE2 deltaT = current_frame_->pose_.inverse() * T_wi; // T_wi_new.inverse() * T_wi_old
 
+    // LOG(INFO) << "0: " << current_frame_->pts_[0].transpose();
     #pragma omp parallel for
     for (size_t i = 0; i < current_frame_->pts_.size(); ++i ) {
         current_frame_->pts_[i] = deltaT * current_frame_->pts_[i];
     }
+    // LOG(INFO) << "1: " << current_frame_->pts_[0].transpose();
     // LOG(INFO) << deltaT.translation().transpose() << ", " << deltaT.so2().log() * 180. / M_PI;
 }
 

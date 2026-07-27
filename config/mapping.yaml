@@ -4,7 +4,7 @@ main:
   odom_topic: /robotvel   # ieskf 加了轮速计之后就不怎么发散了
   
   localization_mode: false   # 定位模式(只更新base->odom, odom->map需要做重定位，重定位太麻烦了，在rviz中用2d pose estimate粗略弄一下得了)
-  with_imu: 1   # 0: LO | 1:eskf LIO | 2:ieskf LIO
+  with_imu: 0   # 0: LO | 1:eskf LIO | 2:ieskf LIO
   delay_time: 5   # ms
 frontend:
   kf_distance: 0.2   # default = 0.25
@@ -23,7 +23,7 @@ ndt:
   res_outlier_th: 10.0  # 卡方检验阈值（95%置信度）  基于马氏距离的卡方检验阈值。   default = 5.661
   capacity: 10000         # 缓存的体素数量   default = 100000
   normalizing_factor: 1e-3  # 正则化因子
-  init_info: 1e6         # 初始化 voxel 信息矩阵
+  init_info: 1e3         # 初始化 voxel 信息矩阵
   nearby_type: 2         # 0:center | 1:4 | 2:8 (default)
 occupancy_map:
   closest_th: 0.1         # MODEL_POINTS 近距离阈值            default = 0.1
@@ -33,12 +33,12 @@ occupancy_map:
 
 imu:
   imu_dt: 0.01   # 0.01s 即 100Hz   检查时间戳用的
-  bax: 0.0380618
-  bay: -0.0107006
-  bg: 0.000122951
+  bax: -0.0256538
+  bay: 0.00428544
+  bg: 0.0111096
   # 噪声设为负数，系统自动计算
-  gyro_var: 2e-1
-  acce_var: 2e-2
+  gyro_var: 0.000528417
+  acce_var: 0.00739726
   bias_gyro_var: -1
   bias_acce_var: -1
   odom_var: 0.5  # 轮速计噪声   正数则在预积分中加入 odom 观测
