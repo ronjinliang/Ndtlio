@@ -26,7 +26,6 @@ bool Frontend::processScan( Scan2d::Ptr scan ){
         LOG(INFO) << "range max: " << range_max_              << ", range min: " << range_min_
                 << ", angle max: " << angle_max_ * 180.0/M_PI << ", angle min: " << angle_min_ * 180.0/M_PI;
     } else {
-        // 因为假设IMU与雷达位置重叠，所以 T_wi 等价于 T_wl
         if ( eskf_ ) {  // eskf
             // ESKF 先验(初值)
             SE2 T_wi = eskf_->getNominalPose();
@@ -70,7 +69,7 @@ bool Frontend::processIMU( const IMUPtr imu ){
         res = ieskf_->predict(imu);
         imu_states_.push_back({imu->timestamp_, ieskf_->getNominalPose()} );
         }
-    if ( imu_states_.size() == opts_.imu_states_buffer_size_ ) imu_states_.pop_front();  // 维持10个imu数据
+    if ( imu_states_.size() > opts_.imu_states_buffer_size_ ) imu_states_.pop_front();  // 维持10个imu数据
     return res;
 }
 
@@ -84,28 +83,30 @@ bool Frontend::processOdom( const std::shared_ptr<Odom> odom ){
 }
 
 void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
+    // 有些地方直接硬编码是因为 /scan 有时候会发布空的数据, 迫不得已只能硬编码
     SE2 T_end = SE2();
-    double lidar_begin_time = double(scan->header.stamp.sec) + double(scan->header.stamp.nanosec)*1e-9;
     if ( eskf_ ) {
         T_end = eskf_->getNominalPose();
     } else if ( ieskf_ ) {
         T_end = ieskf_->getNominalPose();
     }
     
-    bool imu_empty = imu_states_.empty();
+    bool imu_empty = ( imu_states_.empty() || ( imu_states_.size() < opts_.imu_states_buffer_size_ ) );
     
     const float time_th = 0.5;
     int scan_num = scan->ranges.size();
-    double lidar_end_time = 0.0;
     double last_time = 0.0;
     if ( !imu_empty ) {  // 直接 LO
-        lidar_end_time = lidar_begin_time + scan->time_increment * scan_num;
         last_time = imu_states_.rbegin()->first;
     }
 
+    // double lidar_begin_time = last_time - ( scan_num - 1 ) * scan->time_increment;
+    double lidar_begin_time = double(scan->header.stamp.sec) + double(scan->header.stamp.nanosec)*1e-9 - ( scan_num - 1 ) * 0.00025493954308331013;
+
     // 不能用并发, 并发需要提前分配空间, 但是在过程中需要滤波
     for ( int idx = 0; idx < scan_num; ++idx ) {
-        double angle = scan->angle_min + idx * scan->angle_increment;  // 这个跟 range 对应的
+        // double angle = scan->angle_min + idx * scan->angle_increment;  // 这个跟 range 对应的
+        double angle = scan->angle_min + idx * 0.013993730768561363;  // 这个跟 range 对应的
         if ( !first_scan_ && (angle < angle_min_ || angle > angle_max_) ) continue;  // sb 玩意第一帧空的
 
         // if ( !first_scan_ && ( angle > 5./6.*M_PI && angle < 7./6.*M_PI) ) continue;   // 自己数据集去掉背后的数据  TUDO
@@ -113,7 +114,8 @@ void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
         double range = scan->ranges[idx];
         // if ( !first_scan_ && (range < range_min_ || range > range_max_) ) continue;
         if ( !first_scan_ && range > range_max_ ) continue;
-        double query_time = lidar_begin_time + idx * scan->time_increment;
+        // double query_time = lidar_begin_time + idx * scan->time_increment;
+        double query_time = lidar_begin_time + idx * 0.00025493954308331013;
         Vec2d raw_point( range * cos(angle), range * sin(angle) );
         if ( imu_empty ) {
             current_frame_->pts_.emplace_back(raw_point);
@@ -123,8 +125,8 @@ void Frontend::undistortAndGeneratePoints(Scan2d::Ptr scan){
                 LOG(INFO) << "interp false";
                 Ti = T_end;
             }
-            // SE2 deltaT = Ti.inverse() * T_end;
-            SE2 deltaT = T_end.inverse() * Ti;
+            SE2 deltaT = opts_.T_IL_.inverse() * Ti.inverse() * T_end * opts_.T_IL_;
+            // SE2 deltaT = opts_.T_IL_.inverse() * T_end.inverse() * Ti * opts_.T_IL_;
             // T_end:T_w_i_t
             // Ti_t: T_w_i_i  i 时刻变换到 t 时刻
             Vec2d p_compensate = deltaT * raw_point;

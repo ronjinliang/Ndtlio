@@ -26,6 +26,7 @@ public:
         double max_distance_ = 20.0;              // 最远距离 滤掉部分scan
         double angle_boarder_ = 30.0;
         int imu_states_buffer_size_ = 20;
+        SE2 T_IL_ = SE2();
     };
 
     Frontend( Options opts ) : opts_(opts) {}
