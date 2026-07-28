@@ -13,8 +13,9 @@ frontend:
   max_distance: 5.0     # 最远 10m (不包括 occupancy map)
   angle_boarder: 0.0
   imu_states_buffer_size: 50   # 去畸变的imu数据缓存
-  # T_IL: [3.53, 3.87, 0.0] # [x, y, theta]
-  T_IL: [2.40, -3.60, 0.0]
+  T_IL: [0.0, 0.0, 0.0]
+  # T_IL: [3.53, 3.87, 0.0] # [x, y, theta]  mpu6050
+  # T_IL: [2.40, -3.60, 0.0] # mpu9250
 ndt:
   max_iter: 50           # 最大迭代次数
   voxel_size: 0.65        # 体素大小   单位 m / voxel   default = 0.2   太小的话可能在旋转的时候产生偏移
