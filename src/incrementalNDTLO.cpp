@@ -20,6 +20,16 @@ IncrementalNDTLO::IncrementalNDTLO( const std::string & fileName, int with_imu )
     frontend_opts.max_distance_           = config["frontend"]["max_distance"].as<double>();
     frontend_opts.angle_boarder_          = config["frontend"]["angle_boarder"].as<double>() * M_PI / 180.0;
     frontend_opts.imu_states_buffer_size_ = config["frontend"]["imu_states_buffer_size"].as<int>();
+    auto t_il = config["T_IL"];
+    // 确认是序列且长度为3
+    if (t_il.IsSequence() && t_il.size() == 3) {
+        double x   = t_il[0].as<double>();
+        double y   = t_il[1].as<double>();
+        double theta = t_il[2].as<double>();   // 单位与你的系统一致
+
+        frontend_opts.T_IL_ = SE2(theta, Vec2d(x, y));   // 适配你实际的 SE2 实现
+        LOG(INFO) << "雷达IMU外参:\n  平移(m):" << frontend_opts.T_IL_.translation().transpose() << ", 角度(rad): " << frontend_opts.T_IL_.so2().log();
+    }
     
     // 地图
     Map::Options map_opts;
