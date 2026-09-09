@@ -1,8 +1,19 @@
 # NdtLIO
 
-基于**增量式 NDT** 的 2D 激光惯性里程计 / SLAM 系统（ROS2），面向室内移动机器人（如 origincar）。
-
+基于**增量式 NDT** 的 2D 激光惯性里程计 / SLAM 系统（ROS2）。
 支持三种工作模式：纯激光里程计（LO）、ESKF 松耦合 LIO、IESKF 紧耦合 LIO，并提供建图 / 定位两种运行形态。
+
+---
+
+## 演示与效果
+
+LIO 建图 / 运行过程演示（动图）：
+
+![demo](doc/demo1.gif)
+
+建图完成后的全局地图效果：
+
+![global_map](map/global_map.png)
 
 ---
 
@@ -17,7 +28,7 @@
 - **增量占据栅格地图**：Bresenham 直线填充，实时发布 `nav_msgs/OccupancyGrid`，可与 `nav2_map_server` 配合保存地图
 - **关键帧管理**：按位移/角度阈值选取关键帧，输出轨迹 `nav_msgs/Path`
 - **双模式**：建图模式（`base -> map`）、定位模式（`base -> odom`，`map -> odom` 由初始位姿提供）
-- 支持轮速计观测（订阅 `origincar_msg/msg/Data`，可有效抑制发散）
+- 支持轮速计观测（订阅 `origincar_msg/msg/Data`）
 
 ## 参考项目
 
@@ -79,16 +90,6 @@ ros2 run nav2_map_server map_saver_cli -t map -f origincar_map
 节点发布的 `/map` 使用 `transient_local + reliable` QoS，与 `map_saver_cli` 默认 QoS 兼容。
 
 > 说明：`launch/ndt_lio_node.launch.py` 仅启动 `test_ros2_lio` 并重映射两个输出话题（`/scan_point_cloud -> /ndt_lio/scan_point_cloud`、`/ndt_odom -> /ndt_lio/ndt_odom`），**未设置 `config_file` 参数**，直接 launch 会使用代码中的默认路径，建议用 `ros2 run ... -p config_file:=` 显式指定。
-
-## 演示与效果
-
-LIO 建图 / 运行过程演示（动图）：
-
-![demo](doc/demo1.gif)
-
-建图完成后的全局地图效果：
-
-![global_map](map/global_map.png)
 
 ## 话题与 TF
 
